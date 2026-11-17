@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Business Setup & Operations Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<style>
+:root{
+  --bg:#f5f3ef; --surface:#ffffff; --ink:#26241f; --muted:#6f6a60; --line:#e4e0d8;
+  --accent:#3d5a80; --accent-soft:#e8eef6; --warn:#b45309; --warn-soft:#fdf1e3;
+  --danger:#b42318; --danger-soft:#fde8e6; --ok:#2f7d4f; --ok-soft:#e5f3ea;
+  --radius:12px; --shadow:0 1px 2px rgba(0,0,0,.06),0 1px 6px rgba(0,0,0,.04);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+.muted{color:var(--muted)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:#cfc9bd}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:#f0c9c4;background:transparent}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.small{padding:5px 10px;font-size:14px}
+
+/* Header */
+header.top{display:flex;align-items:center;gap:12px;padding:14px 20px;flex-wrap:wrap}
+header.top h1{font-size:20px;margin:0;font-weight:650;letter-spacing:-.01em;flex:1;min-width:220px}
+.save-state{font-size:13px;color:var(--muted);min-width:70px;text-align:right}
+.save-state.err{color:var(--danger)}
+.banner{margin:0 20px 10px;padding:8px 12px;border-radius:10px;background:var(--warn-soft);color:#7a3e06;font-size:14px}
+
+/* Summary + priorities */
+.overview{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px;padding:0 20px 14px}
+@media (max-width:900px){.overview{grid-template-columns:1fr}}
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:600px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;text-align:left;cursor:pointer;box-shadow:var(--shadow)}
+.tile b{display:block;font-size:26px;line-height:1.1;font-weight:650}
+.tile span{font-size:13px;color:var(--muted)}
+.tile.active{outline:2px solid var(--accent);outline-offset:-1px}
+.tile.alert b{color:var(--danger)}
+.priorities{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;box-shadow:var(--shadow)}
+.priorities h2{font-size:14px;margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.priorities ol{margin:0;padding:0;list-style:none}
+.priorities li{display:flex;gap:10px;align-items:baseline;padding:5px 0;border-top:1px solid #f0ede7;cursor:pointer}
+.priorities li:first-child{border-top:0}
+.priorities li .why{font-size:13px;white-space:nowrap;padding:1px 8px;border-radius:999px;background:var(--warn-soft);color:#7a3e06}
+.priorities li .why.red{background:var(--danger-soft);color:var(--danger)}
+.priorities li .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filterbar{margin:0 20px 10px;display:flex;gap:10px;align-items:center;font-size:14px}
+
+/* Board */
+.board{display:grid;grid-template-columns:repeat(5,minmax(270px,1fr));gap:14px;padding:0 20px 30px;overflow-x:auto;align-items:start}
+.col{background:#ece9e3;border-radius:14px;padding:10px;min-height:200px;display:flex;flex-direction:column}
+.col-head{display:flex;align-items:center;gap:8px;padding:4px 4px 10px}
+.col-head h2{font-size:15px;margin:0;font-weight:650;flex:1}
+.col-head .count{font-size:13px;color:var(--muted);background:#fff;border-radius:999px;padding:1px 9px}
+.col-head .add{border:0;background:#fff;border-radius:8px;width:30px;height:30px;font-size:20px;line-height:1;cursor:pointer;color:var(--accent)}
+.col[data-col=attention]{background:#f6e9e2}
+.col[data-col=done]{background:#e6eee7}
+.quick-add input{width:100%;padding:12px;border-radius:10px;border:2px solid var(--accent);margin-bottom:8px;font-size:16px}
+.list{display:flex;flex-direction:column;gap:10px;min-height:80px;flex:1}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:18px 6px;border:1.5px dashed #d6d1c7;border-radius:10px}
+
+.card{background:var(--surface);border-radius:var(--radius);padding:12px 14px 12px 16px;box-shadow:var(--shadow);cursor:grab;position:relative;border-left:5px solid var(--c,#c9c4ba)}
+.card:hover{box-shadow:0 2px 10px rgba(0,0,0,.09)}
+.card.done{opacity:.75}
+.card-top{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;padding-right:26px}
+.chip{font-size:12px;padding:1px 8px;border-radius:999px;background:var(--cs,#efece6);color:#3b382f;white-space:nowrap}
+.chip.ex{background:#eeeaf8;color:#5b4b8a}
+.chip.pri-High{background:var(--warn-soft);color:#7a3e06}
+.chip.pri-Urgent{background:var(--danger-soft);color:var(--danger);font-weight:600}
+.card-title{font-size:17px;font-weight:600;margin:0 0 6px;line-height:1.3;outline:none;border-radius:4px}
+.card-title[contenteditable=true]{background:var(--accent-soft);padding:2px 4px;cursor:text}
+.edit-title{position:absolute;top:8px;right:8px;border:0;background:transparent;cursor:pointer;opacity:.35;font-size:15px;padding:4px;border-radius:6px}
+.card:hover .edit-title{opacity:.8}
+.next{font-size:14.5px;background:#f7f5f1;border-radius:8px;padding:5px 8px;margin-bottom:6px}
+.next span{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
+.flag{font-size:13px;font-weight:600;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:4px 8px;margin-bottom:6px}
+.meta{display:flex;gap:12px;flex-wrap:wrap;font-size:13.5px;color:var(--muted)}
+.meta .late{color:var(--danger);font-weight:600}
+.meta .soon{color:var(--warn);font-weight:600}
+.minibar{height:4px;background:#efece6;border-radius:4px;overflow:hidden;margin-top:8px}
+.minibar i{display:block;height:100%;background:var(--ok)}
+.sortable-ghost{opacity:.35}
+.sortable-chosen{cursor:grabbing}
+
+/* Panel */
+.scrim{position:fixed;inset:0;background:rgba(30,28,24,.25);z-index:20}
+.panel{position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:var(--surface);z-index:21;box-shadow:-6px 0 24px rgba(0,0,0,.12);display:flex;flex-direction:column}
+.panel-head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line)}
+.panel-head .spacer{flex:1}
+.panel-body{overflow-y:auto;padding:14px 18px 40px;flex:1}
+.title-input{width:100%;font-size:22px;font-weight:650;border:1px solid transparent;border-radius:8px;padding:4px 6px;resize:none;background:transparent;line-height:1.3}
+.title-input:hover,.title-input:focus{border-color:var(--line);background:#fbfaf8;outline:none}
+.note-ex{font-size:13.5px;background:#eeeaf8;color:#4a3d72;border-radius:8px;padding:6px 10px;margin:6px 0 4px}
+.section{margin-top:18px}
+.section > h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px;font-weight:650}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:13.5px;color:var(--muted)}
+label.f input,label.f select,label.f textarea{font-size:15.5px;color:var(--ink);padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;width:100%}
+.chips-pick{display:flex;flex-wrap:wrap;gap:6px}
+.chips-pick button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:4px 12px;cursor:pointer;font-size:14px}
+.chips-pick button.on{border-color:var(--cc,#888);background:var(--cs,#eee);font-weight:600}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:#fff;padding:8px 4px;cursor:pointer;font-size:14px;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button.on{background:var(--accent);color:#fff}
+.waitbox{background:#fbf6ee;border:1px solid #efdfc6;border-radius:12px;padding:12px}
+.waitbox.overdue{background:var(--danger-soft);border-color:#f2c4be}
+.waitbox .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.progress{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.progress .bar{flex:1;height:8px;background:#efece6;border-radius:6px;overflow:hidden}
+.progress .bar i{display:block;height:100%;background:var(--ok)}
+.curnext{font-size:14.5px;margin:8px 0;display:grid;gap:3px}
+.curnext b{font-weight:600}
+.steps{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.step{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:8px;background:#faf9f6}
+.step.current{background:var(--accent-soft)}
+.step .grip{cursor:grab;color:#b5afa3;user-select:none;padding:0 2px}
+.step input[type=checkbox]{width:20px;height:20px;accent-color:var(--ok);flex:none}
+.step input.txt{flex:1;border:1px solid transparent;background:transparent;padding:5px 6px;border-radius:6px;font-size:15.5px;min-width:0}
+.step input.txt:focus{border-color:var(--line);background:#fff;outline:none}
+.step.done input.txt{text-decoration:line-through;color:var(--muted)}
+.step .x{border:0;background:transparent;color:#a8a296;cursor:pointer;font-size:18px;padding:0 6px}
+.step .x:hover{color:var(--danger)}
+.add-step{display:flex;gap:6px;margin-top:8px}
+.add-step input{flex:1;padding:8px 10px;border:1px dashed #cfc9bd;border-radius:8px}
+.history{font-size:14px}
+.history summary{cursor:pointer;color:var(--muted)}
+.history ul{list-style:none;padding:0;margin:8px 0 0}
+.history li{padding:4px 0;border-top:1px solid #f0ede7;display:flex;gap:10px}
+.history time{color:var(--muted);white-space:nowrap;font-size:13px;min-width:92px}
+
+/* Modal + toast */
+.modal{position:fixed;inset:0;background:rgba(30,28,24,.35);z-index:40;display:flex;align-items:center;justify-content:center;padding:16px}
+.dialog{background:#fff;border-radius:14px;padding:20px;width:min(520px,100%);max-height:92vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.2);display:flex;flex-direction:column;gap:12px}
+.dialog h2{margin:0;font-size:19px}
+.dialog p{margin:0}
+.dialog .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.dialog textarea{min-height:240px;font-size:14.5px;line-height:1.5}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#2b2925;color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;gap:14px;align-items:center;z-index:50;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:15px;max-width:calc(100vw - 30px)}
+.toast button{background:#fff;color:#2b2925;border:0;border-radius:8px;padding:5px 12px;font-weight:600;cursor:pointer}
+
+/* Login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login .box{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:var(--shadow);text-align:center}
+.login h1{font-size:22px;margin:0 0 6px}
+.login .err{color:var(--danger);margin-top:12px;font-size:14px}
+footer.disc{padding:0 20px 24px;font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div id="login" class="login" hidden>
+  <div class="box">
+    <h1>Business Setup & Operations Tracker</h1>
+    <p class="muted">Sign in to continue.</p>
+    <button id="signin" class="btn primary" style="margin-top:14px">Sign in with Google</button>
+    <div id="loginErr" class="err"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <h1>Business Setup & Operations Tracker</h1>
+    <span id="saveState" class="save-state"></span>
+    <button id="undoBtn" class="btn" disabled title="Undo (Ctrl/Cmd+Z)">↶ Undo</button>
+    <button id="removeExamples" class="btn ghost small" hidden>Remove example tasks</button>
+    <button id="newTask" class="btn primary">+ New task</button>
+    <button id="signout" class="btn ghost small" hidden>Sign out</button>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+
+  <section class="overview">
+    <div class="tiles" id="tiles"></div>
+    <div class="priorities">
+      <h2>Today's priorities</h2>
+      <ol id="priorities"></ol>
+    </div>
+  </section>
+  <div id="filterbar" class="filterbar" hidden></div>
+
+  <main class="board" id="board"></main>
+  <footer class="disc">Workflow checklists and example tasks are organizational aids only, not legal or tax instructions. Verify regulatory requirements and tax treatment with the appropriate professional.</footer>
+</div>
+
+<div id="scrim" class="scrim" hidden></div>
+<aside id="panel" class="panel" hidden aria-label="Task details"></aside>
+<div id="modal" class="modal" hidden></div>
+<div id="toast" class="toast" hidden></div>
+
+<script type="module">
+/* ================================================================
+   1. CONFIGURATION
+   Paste your Firebase web-app config below (see README.md).
+   While apiKey is empty, the app runs in LOCAL DEMO MODE and saves
+   to this browser only.
+   ================================================================ */
+const firebaseConfig = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
+const WORKSPACE_ID = "main";      // one shared workspace; multi-user ready
+const FIREBASE_VERSION = "10.12.2";
+
+/* ================================================================
+   2. CONSTANTS & DEFAULT SETTINGS
+   ================================================================ */
+const COLS = [
+  { id: "todo",      name: "To Do",             empty: "Nothing waiting to start." },
+  { id: "progress",  name: "In Progress",       empty: "Drag a task here when you start it." },
+  { id: "waiting",   name: "Waiting on Others", empty: "Nothing pending from others." },
+  { id: "attention", name: "Needs Attention",   empty: "All clear." },
+  { id: "done",      name: "Completed",         empty: "Finished tasks land here." },
+];
+const STATUS_NAME = Object.fromEntries(COLS.map(c => [c.id, c.name]));
+const PRIORITIES = ["Low", "Normal", "High", "Urgent"];
+
+const DEFAULT_SETTINGS = {
+  companies: [
+    { id: "holding",   name: "Holding GmbH",                short: "Holding",    color: "#5b7bd5", soft: "#e6ecfa" },
+    { id: "operating", name: "adaptABILITY Therapie GmbH",  short: "adaptABILITY", color: "#2e9a8a", soft: "#ddf2ee" },
+    { id: "immo",      name: "S&T Immo GmbH",               short: "S&T Immo",   color: "#c4862f", soft: "#f8ecda" },
+    { id: "kg",        name: "GmbH & Co. KG",               short: "GmbH & Co. KG", color: "#9a6bc4", soft: "#efe6f7" },
+    { id: "general",   name: "General / Multiple Companies", short: "General",   color: "#8a857a", soft: "#efece6" },
+  ],
+  categories: [
+    "Company Formation and Registration", "Banking and Finance", "Accounting and Bookkeeping",
+    "Tax Structure and Coordination", "Legal and Contracts", "Insurance",
+    "Property and Real Estate", "Government and Regulatory Administration", "General Operations",
+  ],
+  signature: "Suzanne Ward",
+};
+
+/* ================================================================
+   3. HELPERS
+   ================================================================ */
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2, "0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = () => ymd(new Date());
+const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d); };
+const parseYmd = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const daysFromToday = s => Math.round((parseYmd(s) - parseYmd(today())) / 86400000);
+const fmt = s => s ? parseYmd(s).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
+const fmtLong = s => s ? parseYmd(s).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+const fmtDE = s => s ? parseYmd(s).toLocaleDateString("de-DE") : "";
+const fmtStamp = iso => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+/* ================================================================
+   4. DATA MODEL
+   Every task carries fields for later phases (contacts, documents,
+   notes, assignee) so nothing needs migrating when they are added.
+   ================================================================ */
+function newTask(fields = {}) {
+  const now = new Date().toISOString();
+  return {
+    id: uid(),
+    title: "Untitled task",
+    companies: [],
+    category: "",
+    priority: "Normal",
+    responsible: "",
+    assigneeUid: null,          // Phase 3: shared access
+    dueDate: "",
+    status: "todo",
+    order: 0,
+    steps: [],                  // {id, text, done, doneAt}
+    waiting: { who: "", what: "", contactedOn: "", followUpOn: "", expectedResponseOn: "" },
+    contacts: [],               // Phase 2: {name, role, email, phone, lastContactOn, expectedResponseOn, nextFollowUpOn}
+    documents: [],              // Phase 2: {name, url, storagePath, required, state: requested|received|submitted|approved}
+    notes: [],                  // Phase 2: {id, at, kind: call|meeting|email|note, text}
+    history: [{ at: now, type: "created", text: "Task created" }],
+    example: false,
+    createdAt: now,
+    updatedAt: now,
+    completedAt: null,
+    ...fields,
+  };
+}
+const mkSteps = (texts, doneCount = 0) => texts.map((text, i) => ({
+  id: uid(), text, done: i < doneCount, doneAt: i < doneCount ? new Date().toISOString() : null,
+}));
+
+function sampleTasks() {
+  let o = 0;
+  const T = f => newTask({ example: true, order: (o += 1000), ...f });
+  return [
+    T({ title: "Open Holding GmbH bank account", companies: ["holding"], category: "Banking and Finance",
+        priority: "High", status: "progress", dueDate: addDays(14), responsible: "Suzanne",
+        steps: mkSteps(["Research banks and account requirements", "Select banking provider", "Contact bank representative",
+          "Collect company documents", "Submit application", "Complete identity verification", "Await bank approval",
+          "Receive IBAN and account confirmation", "Confirm banking access", "Mark workflow completed"], 3) }),
+    T({ title: "Confirm bank accounts for each entity", companies: ["general"], category: "Banking and Finance",
+        status: "todo", dueDate: addDays(30),
+        steps: mkSteps(["List each entity and its intended bank", "Confirm Holding GmbH account", "Confirm adaptABILITY Therapie GmbH account",
+          "Confirm S&T Immo GmbH account", "Confirm GmbH & Co. KG account", "File account confirmations"]) }),
+    T({ title: "Coordinate tax structure with Steuerberater", companies: ["general"], category: "Tax Structure and Coordination",
+        priority: "High", status: "waiting", dueDate: addDays(21),
+        waiting: { who: "Steuerberater (example)", what: "Feedback on the proposed holding structure",
+                   contactedOn: addDays(-10), followUpOn: addDays(-2), expectedResponseOn: addDays(-3) },
+        steps: mkSteps(["Identify questions for Steuerberater", "Schedule consultation", "Send supporting information",
+          "Record recommendations", "Assign follow-up actions", "Confirm implementation"], 3) }),
+    T({ title: "Review intercompany agreements", companies: ["holding", "operating", "immo"], category: "Legal and Contracts",
+        status: "todo", dueDate: addDays(45),
+        steps: mkSteps(["List services and payments between entities", "Ask advisers which arrangements should be documented",
+          "Draft or request agreements", "Review drafts", "Sign agreements", "File signed copies"]) }),
+    T({ title: "Track outstanding notary documents", companies: ["kg"], category: "Company Formation and Registration",
+        status: "waiting", dueDate: addDays(20),
+        waiting: { who: "Notary office (example)", what: "Certified copies of signed documents",
+                   contactedOn: addDays(-3), followUpOn: addDays(4), expectedResponseOn: addDays(3) },
+        steps: mkSteps(["List documents still outstanding", "Confirm what the notary will send", "Receive certified copies", "File copies"], 1) }),
+    T({ title: "Confirm company registration documentation", companies: ["immo"], category: "Company Formation and Registration",
+        status: "progress", dueDate: addDays(7),
+        steps: mkSteps(["Collect commercial register excerpt", "Collect articles of association", "Collect shareholder list",
+          "Ask adviser which other registrations apply", "File copies in company folder"], 2) }),
+    T({ title: "Establish bookkeeping processes", companies: ["operating"], category: "Accounting and Bookkeeping",
+        status: "todo", dueDate: addDays(28),
+        steps: mkSteps(["Agree process with Steuerberater", "Choose receipt collection method", "Set monthly bookkeeping routine", "Document the process"]) }),
+    T({ title: "Organize tax and insurance records", companies: ["general"], category: "Insurance",
+        priority: "Low", status: "todo",
+        steps: mkSteps(["Create folder structure per entity", "Gather existing policies", "Gather tax correspondence", "Record renewal or review dates"]) }),
+    T({ title: "Schedule financial advisor follow-up", companies: ["general"], category: "Banking and Finance",
+        status: "attention", dueDate: addDays(2),
+        steps: mkSteps(["Decide which topics to cover", "Propose meeting times", "Confirm appointment"]) }),
+    T({ title: "Review upcoming administrative deadlines", companies: ["general"], category: "Government and Regulatory Administration",
+        status: "todo", dueDate: addDays(10),
+        steps: mkSteps(["Ask advisers for known upcoming deadlines", "Add each deadline as a task", "Set reminders"]) }),
+  ];
+}
+
+/* ================================================================
+   5. STORAGE ADAPTERS
+   ================================================================ */
+function localStore() {
+  const KEY = "bsot-v1";
+  let data = null;
+  try { data = JSON.parse(localStorage.getItem(KEY)); } catch {}
+  const save = () => localStorage.setItem(KEY, JSON.stringify(data));
+  return {
+    mode: "local",
+    async init() {
+      if (!data) {
+        data = { settings: { ...DEFAULT_SETTINGS, seeded: true }, tasks: {} };
+        sampleTasks().forEach(t => data.tasks[t.id] = t);
+        save();
+      }
+    },
+    subscribe(onTasks, onSettings) { onSettings(data.settings); onTasks(Object.values(data.tasks)); },
+    async saveTasks(list) { list.forEach(t => data.tasks[t.id] = t); save(); },
+    async deleteTasks(ids) { ids.forEach(id => delete data.tasks[id]); save(); },
+    async saveSettings(s) { data.settings = s; save(); },
+  };
+}
+
+async function firebaseStore() {
+  const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
+  const { initializeApp } = await import(`${base}/firebase-app.js`);
+  const A = await import(`${base}/firebase-auth.js`);
+  const F = await import(`${base}/firebase-firestore.js`);
+  const app = initializeApp(firebaseConfig);
+  const auth = A.getAuth(app);
+  let db;
+  try {
+    db = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) });
+  } catch { db = F.getFirestore(app); }
+  const wsRef = F.doc(db, "workspaces", WORKSPACE_ID);
+  const tasksCol = F.collection(wsRef, "tasks");
+  return {
+    mode: "cloud",
+    signIn: () => A.signInWithPopup(auth, new A.GoogleAuthProvider()),
+    signOut: () => A.signOut(auth),
+    onAuth: cb => A.onAuthStateChanged(auth, cb),
+    async init() {
+      const snap = await F.getDoc(wsRef);
+      if (!snap.exists()) {
+        const b = F.writeBatch(db);
+        b.set(wsRef, { ...DEFAULT_SETTINGS, seeded: true, createdAt: new Date().toISOString() });
+        sampleTasks().forEach(t => b.set(F.doc(tasksCol, t.id), clone(t)));
+        await b.commit();
+      }
+    },
+    subscribe(onTasks, onSettings, onError) {
+      F.onSnapshot(wsRef, s => s.exists() && onSettings(s.data()), onError);
+      F.onSnapshot(tasksCol, qs => onTasks(qs.docs.map(d => ({ ...d.data(), id: d.id }))), onError);
+    },
+    async saveTasks(list) {
+      const b = F.writeBatch(db);
+      list.forEach(t => b.set(F.doc(tasksCol, t.id), clone(t)));
+      await b.commit();
+    },
+    async deleteTasks(ids) {
+      const b = F.writeBatch(db);
+      ids.forEach(id => b.delete(F.doc(tasksCol, id)));
+      await b.commit();
+    },
+    async saveSettings(s) { await F.setDoc(wsRef, clone(s), { merge: true }); },
+  };
+}
+
+/* ================================================================
+   6. STATE & PERSISTENCE
+   ================================================================ */
+let store;
+const state = { tasks: new Map(), settings: DEFAULT_SETTINGS, filter: null, openId: null };
+const undoStack = [];
+let pending = 0, saveError = false;
+
+function setSaveState() {
+  const el = $("#saveState");
+  el.classList.toggle("err", saveError);
+  el.textContent = saveError ? "Not saved" : pending ? "Saving…" : "All changes saved";
+}
+function persist(tasks) {
+  const list = [].concat(tasks);
+  const now = new Date().toISOString();
+  list.forEach(t => { t.updatedAt = now; state.tasks.set(t.id, t); });
+  pending++; saveError = false; setSaveState();
+  store.saveTasks(list.map(clone))
+    .then(() => { pending--; setSaveState(); })
+    .catch(e => { pending--; saveError = true; setSaveState(); console.error(e); toast("Could not save: " + e.message); });
+}
+function removeTasks(ids) {
+  ids.forEach(id => state.tasks.delete(id));
+  pending++; setSaveState();
+  store.deleteTasks(ids)
+    .then(() => { pending--; setSaveState(); })
+    .catch(e => { pending--; saveError = true; setSaveState(); toast("Could not delete: " + e.message); });
+}
+function log(t, text, type = "info") {
+  (t.history ||= []).push({ at: new Date().toISOString(), type, text });
+}
+function pushUndo(label, tasks, extra = {}) {
+  undoStack.push({ label, before: [].concat(tasks).map(clone), ...extra });
+  if (undoStack.length > 30) undoStack.shift();
+  $("#undoBtn").disabled = false;
+}
+function undo() {
+  const u = undoStack.pop();
+  $("#undoBtn").disabled = !undoStack.length;
+  if (!u) return;
+  if (u.createdIds) removeTasks(u.createdIds);
+  if (u.before.length) persist(u.before);
+  renderAll();
+  if (state.openId && state.tasks.has(state.openId)) renderPanel(); else closePanel();
+  toast(`Undone: ${u.label}`);
+}
+
+/* ================================================================
+   7. DERIVED VIEWS
+   ================================================================ */
+const company = id => state.settings.companies.find(c => c.id === id);
+const isFollowUpOverdue = t => t.status === "waiting" && !!t.waiting?.followUpOn && t.waiting.followUpOn < today();
+const isFollowUpToday = t => t.status === "waiting" && t.waiting?.followUpOn === today();
+const isDueOverdue = t => t.status !== "done" && !!t.dueDate && t.dueDate < today();
+// Overdue follow-ups are SHOWN in Needs Attention but keep status "waiting".
+const colOf = t => isFollowUpOverdue(t) ? "attention" : t.status;
+const openSteps = t => (t.steps || []).filter(s => !s.done);
+const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
+const thisMonth = () => today().slice(0, 7);
+
+const FILTERS = {
+  open:     { label: "Open tasks",           test: t => t.status !== "done" },
+  progress: { label: "In progress",          test: t => t.status === "progress" },
+  waiting:  { label: "Waiting on others",    test: t => t.status === "waiting" },
+  overdue:  { label: "Overdue follow-ups",   test: isFollowUpOverdue },
+  month:    { label: "Completed this month", test: t => t.status === "done" && (t.completedAt || "").slice(0, 7) === thisMonth() },
+};
+
+function priorityList() {
+  const out = [];
+  for (const t of state.tasks.values()) {
+    if (t.status === "done") continue;
+    let score = 0, why = "", red = false;
+    if (isFollowUpOverdue(t)) { score = 100 - daysFromToday(t.waiting.followUpOn); why = `Follow-up ${-daysFromToday(t.waiting.followUpOn)}d overdue`; red = true; }
+    else if (isDueOverdue(t)) { score = 90; why = "Past due date"; red = true; }
+    else if (isFollowUpToday(t)) { score = 85; why = "Follow up today"; }
+    else if (t.status === "attention") { score = 80; why = "Needs attention"; }
+    else if (t.priority === "Urgent") { score = 70; why = "Urgent"; red = true; }
+    else if (t.dueDate && daysFromToday(t.dueDate) <= 3) { score = 60 - daysFromToday(t.dueDate); why = daysFromToday(t.dueDate) === 0 ? "Due today" : `Due in ${daysFromToday(t.dueDate)}d`; }
+    else if (t.priority === "High" && t.status !== "waiting") { score = 30; why = "High priority"; }
+    if (score) out.push({ t, score, why, red });
+  }
+  return out.sort((a, b) => b.score - a.score).slice(0, 5);
+}
+
+/* ================================================================
+   8. RENDERING — overview & board
+   ================================================================ */
+function renderTiles() {
+  const all = [...state.tasks.values()];
+  const tiles = [
+    ["open", "Open tasks", all.filter(FILTERS.open.test).length],
+    ["progress", "In progress", all.filter(FILTERS.progress.test).length],
+    ["waiting", "Waiting on others", all.filter(FILTERS.waiting.test).length],
+    ["overdue", "Overdue follow-ups", all.filter(FILTERS.overdue.test).length],
+    ["month", "Completed this month", all.filter(FILTERS.month.test).length],
+  ];
+  $("#tiles").innerHTML = tiles.map(([k, label, n]) =>
+    `<button class="tile ${state.filter === k ? "active" : ""} ${k === "overdue" && n ? "alert" : ""}" data-filter="${k}"><b>${n}</b><span>${label}</span></button>`
+  ).join("");
+  const fb = $("#filterbar");
+  if (state.filter) {
+    fb.hidden = false;
+    fb.innerHTML = `<span>Showing: <b>${FILTERS[state.filter].label}</b> <span class="muted">(dragging paused while filtered)</span></span> <button class="btn small" data-filter="">Show all</button>`;
+  } else fb.hidden = true;
+  $("#removeExamples").hidden = !all.some(t => t.example);
+}
+
+function renderPriorities() {
+  const list = priorityList();
+  $("#priorities").innerHTML = list.length
+    ? list.map(({ t, why, red }) => `<li data-open="${t.id}"><span class="why ${red ? "red" : ""}">${esc(why)}</span><span class="t">${esc(t.title)}</span></li>`).join("")
+    : `<li class="muted" style="cursor:default">Nothing urgent today.</li>`;
+}
+
+function cardHTML(t) {
+  const comps = (t.companies || []).map(company).filter(Boolean);
+  const steps = t.steps || [], done = steps.filter(s => s.done).length;
+  const next = openSteps(t)[0];
+  const chips = comps.map(c => `<span class="chip" style="--cs:${c.soft}">${esc(c.short || c.name)}</span>`).join("")
+    + (t.priority === "High" || t.priority === "Urgent" ? `<span class="chip pri-${t.priority}">${t.priority}</span>` : "")
+    + (t.example ? `<span class="chip ex">Example</span>` : "");
+  let flag = "";
+  if (isFollowUpOverdue(t)) flag = `<div class="flag">⚑ Follow-up overdue · still Waiting on Others</div>`;
+  const meta = [];
+  if (t.status === "waiting" && t.waiting?.followUpOn && !isFollowUpOverdue(t)) {
+    const d = daysFromToday(t.waiting.followUpOn);
+    meta.push(`<span class="${d <= 1 ? "soon" : ""}">↻ Follow up ${d === 0 ? "today" : fmt(t.waiting.followUpOn)}</span>`);
+  }
+  if (t.dueDate && t.status !== "done") {
+    const late = isDueOverdue(t), soon = !late && daysFromToday(t.dueDate) <= 3;
+    meta.push(`<span class="${late ? "late" : soon ? "soon" : ""}">📅 ${late ? "Overdue · " : ""}${fmt(t.dueDate)}</span>`);
+  }
+  const contact = t.waiting?.who || t.contacts?.[0]?.name || "";
+  if (contact) meta.push(`<span>👤 ${esc(contact)}</span>`);
+  if (steps.length) meta.push(`<span>${done}/${steps.length} steps</span>`);
+  const nextLine = t.status === "done" ? "" :
+    t.status === "waiting" && t.waiting?.what ? `<div class="next"><span>Waiting for</span>${esc(t.waiting.what)}</div>` :
+    `<div class="next"><span>Next</span>${next ? esc(next.text) : `<i class="muted">Add a first step</i>`}</div>`;
+  return `<article class="card ${t.status === "done" ? "done" : ""}" data-id="${t.id}" style="--c:${comps[0]?.color || "#c9c4ba"}">
+    <button class="edit-title" data-edit="${t.id}" title="Rename" aria-label="Rename task">✎</button>
+    <div class="card-top">${chips}</div>
+    <h3 class="card-title">${esc(t.title)}</h3>
+    ${flag}${nextLine}
+    ${meta.length ? `<div class="meta">${meta.join("")}</div>` : ""}
+    ${steps.length ? `<div class="minibar"><i style="width:${Math.round(done / steps.length * 100)}%"></i></div>` : ""}
+  </article>`;
+}
+
+let sortables = [];
+function buildBoard() {
+  $("#board").innerHTML = COLS.map(c => `
+    <section class="col" data-col="${c.id}">
+      <div class="col-head"><h2>${c.name}</h2><span class="count" data-count="${c.id}">0</span>
+        <button class="add" data-add="${c.id}" title="Add task to ${c.name}" aria-label="Add task to ${c.name}">+</button></div>
+      <form class="quick-add" data-qa="${c.id}" hidden><input placeholder="Task name, then Enter" aria-label="New task name"></form>
+      <div class="list" data-col="${c.id}"></div>
+    </section>`).join("");
+  sortables = [...document.querySelectorAll(".list")].map(el => Sortable.create(el, {
+    group: "board", animation: 120, draggable: ".card",
+    filter: "[contenteditable=true], .edit-title", preventOnFilter: false,
+    delay: 160, delayOnTouchOnly: true, ghostClass: "sortable-ghost",
+    onEnd: onDragEnd,
+  }));
+}
+
+function renderBoard() {
+  const f = state.filter && FILTERS[state.filter];
+  const tasks = [...state.tasks.values()];
+  for (const c of COLS) {
+    let list = tasks.filter(t => colOf(t) === c.id);
+    const total = list.length;
+    if (f) list = list.filter(f.test);
+    list.sort(c.id === "done"
+      ? (a, b) => (b.completedAt || "").localeCompare(a.completedAt || "") || byOrder(a, b)
+      : byOrder);
+    const el = document.querySelector(`.list[data-col="${c.id}"]`);
+    el.innerHTML = list.length ? list.map(cardHTML).join("") : `<div class="empty">${f ? "No matching tasks." : c.empty}</div>`;
+    document.querySelector(`[data-count="${c.id}"]`).textContent = f ? `${list.length}/${total}` : total;
+  }
+  sortables.forEach(s => s.option("disabled", !!state.filter));
+}
+
+function renderAll() { renderTiles(); renderPriorities(); renderBoard(); }
+
+/* ================================================================
+   9. BOARD INTERACTIONS
+   ================================================================ */
+let lastDragEnd = 0;
+function onDragEnd(evt) {
+  lastDragEnd = Date.now();
+  const id = evt.item.dataset.id, t = state.tasks.get(id);
+  const fromCol = evt.from.dataset.col, toCol = evt.to.dataset.col;
+  if (!t || (fromCol === toCol && evt.oldIndex === evt.newIndex)) return;
+  const ids = [...evt.to.querySelectorAll(".card")].map(e => e.dataset.id);
+  const affected = ids.map(i => state.tasks.get(i)).filter(Boolean);
+  pushUndo(fromCol === toCol ? `reorder “${t.title}”` : `move “${t.title}”`, affected);
+  affected.forEach((x, ix) => { x.order = (ix + 1) * 1000; });
+  if (fromCol !== toCol) changeStatus(t, toCol);
+  persist(affected);
+  renderAll();
+  if (fromCol !== toCol) {
+    toast(`Moved to ${STATUS_NAME[toCol]}`, true);
+    if (toCol === "waiting") openWaitingPrompt(t);
+  }
+}
+
+function changeStatus(t, s) {
+  if (t.status === s) return;
+  const prev = t.status;
+  t.status = s;
+  if (s === "done") t.completedAt = new Date().toISOString();
+  else if (prev === "done") t.completedAt = null;
+  log(t, `Status: ${STATUS_NAME[prev]} → ${STATUS_NAME[s]}`, "status");
+}
+
+function openQuickAdd(col) {
+  if (state.filter) { state.filter = null; renderAll(); }
+  document.querySelectorAll(".quick-add").forEach(f => f.hidden = f.dataset.qa !== col);
+  const f = document.querySelector(`.quick-add[data-qa="${col}"]`);
+  f.hidden = false;
+  const inp = f.querySelector("input");
+  inp.value = "";
+  inp.focus();
+  f.closest(".col").scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+}
+
+function createTask(title, col) {
+  const minOrder = Math.min(1000, ...[...state.tasks.values()].filter(t => t.status === col).map(t => t.order ?? 0));
+  const t = newTask({ title, status: col, order: minOrder - 1000 });
+  if (col === "done") t.completedAt = new Date().toISOString();
+  undoStack.push({ label: `add “${title}”`, before: [], createdIds: [t.id] });
+  $("#undoBtn").disabled = false;
+  persist(t);
+  renderAll();
+  if (col === "waiting") openWaitingPrompt(t);
+}
+
+function startInlineRename(id) {
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  const h = card?.querySelector(".card-title");
+  if (!h) return;
+  h.contentEditable = "true";
+  h.focus();
+  const r = document.createRange(); r.selectNodeContents(h);
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  const finish = save => {
+    h.removeEventListener("blur", onBlur);
+    h.removeEventListener("keydown", onKey);
+    h.contentEditable = "false";
+    const t = state.tasks.get(id), v = h.textContent.trim();
+    if (save && t && v && v !== t.title) { pushUndo(`rename “${t.title}”`, t); t.title = v; persist(t); }
+    renderAll();
+  };
+  const onBlur = () => finish(true);
+  const onKey = e => {
+    if (e.key === "Enter") { e.preventDefault(); h.blur(); }
+    if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  };
+  h.addEventListener("blur", onBlur);
+  h.addEventListener("keydown", onKey);
+}
+
+/* ================================================================
+   10. TICKET PANEL
+   ================================================================ */
+function openPanel(id) {
+  state.openId = id;
+  $("#scrim").hidden = false;
+  $("#panel").hidden = false;
+  renderPanel();
+  $("#panel .panel-body").scrollTop = 0;
+}
+function closePanel() {
+  state.openId = null;
+  $("#scrim").hidden = true;
+  $("#panel").hidden = true;
+}
+const current = () => state.tasks.get(state.openId);
+
+function renderPanel() {
+  const t = current();
+  if (!t) return closePanel();
+  const steps = t.steps || [], done = steps.filter(s => s.done).length;
+  const open = openSteps(t);
+  const pct = steps.length ? Math.round(done / steps.length * 100) : 0;
+  const w = t.waiting || {};
+  const showWait = t.status === "waiting" || w.who || w.what || w.followUpOn;
+  const overdue = isFollowUpOverdue(t);
+  const cats = state.settings.categories;
+  const scrollTop = $("#panel .panel-body")?.scrollTop || 0;
+
+  $("#panel").innerHTML = `
+  <div class="panel-head">
+    <select data-field="status" aria-label="Status" style="padding:7px 10px;border-radius:8px;border:1px solid var(--line);font-weight:600">
+      ${COLS.map(c => `<option value="${c.id}" ${t.status === c.id ? "selected" : ""}>${c.name}</option>`).join("")}
+    </select>
+    ${overdue ? `<span class="chip pri-Urgent">Follow-up overdue</span>` : ""}
+    <span class="spacer"></span>
+    <button class="btn ghost small" data-act="close" aria-label="Close">✕ Close</button>
+  </div>
+  <div class="panel-body">
+    <textarea class="title-input" data-field="title" rows="1" aria-label="Task name">${esc(t.title)}</textarea>
+    ${t.example ? `<div class="note-ex">Example task — an organizational illustration, not a verified legal or tax requirement. Edit or delete freely.</div>` : ""}
+
+    <div class="section">
+      <h3>Details</h3>
+      <label class="f" style="margin-bottom:10px">Company / entity
+        <div class="chips-pick">
+          ${state.settings.companies.map(c => `<button type="button" data-company="${c.id}" class="${(t.companies || []).includes(c.id) ? "on" : ""}" style="--cc:${c.color};--cs:${c.soft}">${esc(c.name)}</button>`).join("")}
+        </div>
+      </label>
+      <div class="grid2">
+        <label class="f">Category
+          <select data-field="category"><option value="">—</option>
+            ${cats.map(c => `<option ${t.category === c ? "selected" : ""}>${esc(c)}</option>`).join("")}
+          </select></label>
+        <label class="f">Responsible person
+          <input data-field="responsible" value="${esc(t.responsible)}" placeholder="e.g. Suzanne"></label>
+        <label class="f">Target completion date
+          <input type="date" data-field="dueDate" value="${esc(t.dueDate)}"></label>
+        <label class="f">Priority
+          <div class="seg">${PRIORITIES.map(p => `<button type="button" data-priority="${p}" class="${t.priority === p ? "on" : ""}">${p}</button>`).join("")}</div></label>
+      </div>
+    </div>
+
+    ${showWait ? `
+    <div class="section">
+      <h3>Waiting on others</h3>
+      <div class="waitbox ${overdue ? "overdue" : ""}">
+        <div class="grid2">
+          <label class="f">Who are we waiting for?<input data-wait="who" value="${esc(w.who)}"></label>
+          <label class="f">What are we waiting for?<input data-wait="what" value="${esc(w.what)}"></label>
+          <label class="f">Last contacted<input type="date" data-wait="contactedOn" value="${esc(w.contactedOn)}"></label>
+          <label class="f">Expected response by<input type="date" data-wait="expectedResponseOn" value="${esc(w.expectedResponseOn)}"></label>
+          <label class="f">Next follow-up<input type="date" data-wait="followUpOn" value="${esc(w.followUpOn)}"></label>
+        </div>
+        <div class="actions">
+          <button class="btn primary" data-act="followup">✓ Follow Up Completed</button>
+          <button class="btn" data-act="email">✉ Follow-up email</button>
+        </div>
+      </div>
+    </div>` : ""}
+
+    <div class="section">
+      <h3>Workflow checklist</h3>
+      <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${done} of ${steps.length} done</span></div>
+      ${steps.length ? `<div class="curnext">
+        <div><span class="muted">Current step:</span> <b>${open[0] ? esc(open[0].text) : "All steps complete ✓"}</b></div>
+        ${open[1] ? `<div><span class="muted">Then:</span> ${esc(open[1].text)}</div>` : ""}
+      </div>` : ""}
+      <ul class="steps" id="steps">
+        ${steps.map(s => `<li class="step ${s.done ? "done" : ""} ${open[0]?.id === s.id ? "current" : ""}" data-step="${s.id}">
+          <span class="grip" title="Drag to reorder">⋮⋮</span>
+          <input type="checkbox" data-check="${s.id}" ${s.done ? "checked" : ""} aria-label="Done">
+          <input class="txt" data-steptext="${s.id}" value="${esc(s.text)}" aria-label="Step text">
+          <button class="x" data-delstep="${s.id}" title="Remove step" aria-label="Remove step">×</button>
+        </li>`).join("")}
+      </ul>
+      <form class="add-step" id="addStep"><input placeholder="Add a step, then Enter" aria-label="New step"><button class="btn small">Add</button></form>
+    </div>
+
+    <div class="section history">
+      <details><summary>Activity history (${(t.history || []).length})</summary>
+        <ul>${[...(t.history || [])].reverse().map(h => `<li><time>${fmtStamp(h.at)}</time><span>${esc(h.text)}</span></li>`).join("")}</ul>
+      </details>
+    </div>
+
+    <div class="section" style="margin-top:28px">
+      <button class="btn danger" data-act="delete">Delete task</button>
+    </div>
+  </div>`;
+
+  const ta = $("#panel .title-input");
+  const fit = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+  fit(); ta.addEventListener("input", fit);
+  $("#panel .panel-body").scrollTop = scrollTop;
+
+  Sortable.create($("#steps"), {
+    handle: ".grip", animation: 120,
+    onEnd: e => {
+      if (e.oldIndex === e.newIndex) return;
+      const t = current(); pushUndo("reorder steps", t);
+      const [m] = t.steps.splice(e.oldIndex, 1); t.steps.splice(e.newIndex, 0, m);
+      persist(t); renderPanel(); renderBoard();
+    },
+  });
+}
+
+// Text edits: save shortly after typing stops (no re-render while typing).
+const saveSoon = debounce(t => { persist(t); renderAll(); }, 450);
+
+function wirePanel() {
+  const P = $("#panel");
+  P.addEventListener("input", e => {
+    const t = current(); if (!t) return;
+    const el = e.target;
+    if (el.dataset.field === "title" || el.dataset.field === "responsible") {
+      t[el.dataset.field] = el.dataset.field === "title" ? el.value.replace(/\n/g, " ") : el.value;
+      saveSoon(t);
+    } else if (el.dataset.wait && el.type !== "date") {
+      t.waiting = { ...(t.waiting || {}), [el.dataset.wait]: el.value }; saveSoon(t);
+    } else if (el.dataset.steptext) {
+      const s = t.steps.find(s => s.id === el.dataset.steptext); if (s) { s.text = el.value; saveSoon(t); }
+    }
+  });
+  P.addEventListener("change", e => {
+    const t = current(); if (!t) return;
+    const el = e.target;
+    if (el.dataset.field === "status") {
+      const prev = t.status;
+      pushUndo(`status of “${t.title}”`, t);
+      changeStatus(t, el.value); persist(t); renderAll(); renderPanel();
+      if (el.value === "waiting" && prev !== "waiting") openWaitingPrompt(t);
+    } else if (el.dataset.field === "category" || el.dataset.field === "dueDate") {
+      t[el.dataset.field] = el.value; persist(t); renderAll();
+    } else if (el.dataset.wait && el.type === "date") {
+      t.waiting = { ...(t.waiting || {}), [el.dataset.wait]: el.value };
+      if (el.dataset.wait === "followUpOn") log(t, el.value ? `Follow-up date set to ${fmt(el.value)}` : "Follow-up date cleared", "followup");
+      persist(t); renderAll(); renderPanel();
+    } else if (el.dataset.check) {
+      const s = t.steps.find(s => s.id === el.dataset.check); if (!s) return;
+      pushUndo("check step", t);
+      s.done = el.checked; s.doneAt = el.checked ? new Date().toISOString() : null;
+      log(t, `${el.checked ? "Completed" : "Reopened"} step: ${s.text}`, "step");
+      persist(t); renderAll(); renderPanel();
+      if (el.checked && t.steps.every(x => x.done) && t.status !== "done") {
+        toastAction("All steps done. Mark task completed?", "Complete", () => {
+          pushUndo(`complete “${t.title}”`, t); changeStatus(t, "done"); persist(t); renderAll(); renderPanel();
+        });
+      }
+    }
+  });
+  P.addEventListener("click", e => {
+    const t = current(); if (!t) return;
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.company) {
+      const id = b.dataset.company, set = new Set(t.companies || []);
+      set.has(id) ? set.delete(id) : set.add(id);
+      t.companies = [...set]; persist(t); renderAll(); renderPanel();
+    } else if (b.dataset.priority) {
+      t.priority = b.dataset.priority; persist(t); renderAll(); renderPanel();
+    } else if (b.dataset.delstep) {
+      pushUndo("remove step", t);
+      t.steps = t.steps.filter(s => s.id !== b.dataset.delstep); persist(t); renderAll(); renderPanel();
+      toast("Step removed", true);
+    } else if (b.dataset.act === "close") closePanel();
+    else if (b.dataset.act === "followup") followUpCompleted(t);
+    else if (b.dataset.act === "email") emailTemplate(t);
+    else if (b.dataset.act === "delete") confirmDelete(t);
+  });
+  P.addEventListener("submit", e => {
+    e.preventDefault();
+    const t = current(); if (!t) return;
+    const inp = e.target.querySelector("input"), v = inp.value.trim();
+    if (!v) return;
+    (t.steps ||= []).push({ id: uid(), text: v, done: false, doneAt: null });
+    persist(t); renderAll(); renderPanel();
+    $("#addStep input").focus();
+  });
+}
+
+/* ================================================================
+   11. DIALOGS: waiting prompt, follow-up, email, delete
+   ================================================================ */
+function modal(html, actions) {
+  const m = $("#modal");
+  m.innerHTML = `<form class="dialog">${html}<div class="actions">${actions.map((a, i) =>
+    `<button type="button" data-i="${i}" class="btn ${a.cls || ""}">${a.label}</button>`).join("")}</div></form>`;
+  m.hidden = false;
+  const form = m.querySelector("form");
+  const click = i => {
+    const a = actions[i];
+    if (a?.onClick && a.onClick(Object.fromEntries(new FormData(form)), form) === false) return;
+    m.hidden = true; m.innerHTML = "";
+  };
+  form.addEventListener("submit", e => { e.preventDefault(); click(actions.findIndex(a => a.primary)); });
+  form.querySelectorAll("[data-i]").forEach(b => b.addEventListener("click", () => click(+b.dataset.i)));
+  setTimeout(() => form.querySelector("input:not([type=date]),textarea")?.focus(), 30);
+  return form;
+}
+function closeModal() { $("#modal").hidden = true; $("#modal").innerHTML = ""; }
+
+function openWaitingPrompt(t) {
+  const w = t.waiting || {};
+  const follow = w.followUpOn && w.followUpOn >= today() ? w.followUpOn : addDays(7);
+  modal(`<h2>Waiting on others</h2>
+    <p class="muted">“${esc(t.title)}” — all fields optional.</p>
+    <label class="f">Who are we waiting for?<input name="who" value="${esc(w.who)}" placeholder="e.g. Bank, Steuerberater, notary"></label>
+    <label class="f">What are we waiting for?<input name="what" value="${esc(w.what)}" placeholder="e.g. Account approval"></label>
+    <div class="grid2">
+      <label class="f">When did we contact them?<input type="date" name="contactedOn" value="${esc(w.contactedOn || today())}"></label>
+      <label class="f">When should we follow up?<input type="date" name="followUpOn" value="${follow}"></label>
+    </div>`,
+    [{ label: "Skip", cls: "ghost" },
+     { label: "Save", cls: "primary", primary: true, onClick: v => {
+        t.waiting = { ...(t.waiting || {}), ...v };
+        log(t, `Waiting on ${v.who || "others"}${v.what ? " for " + v.what : ""}${v.followUpOn ? `; follow up ${fmt(v.followUpOn)}` : ""}`, "followup");
+        persist(t); renderAll(); if (state.openId === t.id) renderPanel();
+     } }]);
+}
+
+function followUpCompleted(t) {
+  modal(`<h2>Follow-up completed</h2>
+    <p>Today (${fmtLong(today())}) will be recorded as the last contact date.</p>
+    <div class="grid2">
+      <label class="f">Expected response by<input type="date" name="exp" value="${addDays(5)}"></label>
+      <label class="f">Next follow-up if no reply<input type="date" name="next" value="${addDays(7)}"></label>
+    </div>
+    <label class="f">Note (optional)<input name="note" placeholder="e.g. Called, left voicemail"></label>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Save", cls: "primary", primary: true, onClick: v => {
+        pushUndo(`follow-up on “${t.title}”`, t);
+        t.waiting = { ...(t.waiting || {}), contactedOn: today(), expectedResponseOn: v.exp, followUpOn: v.next };
+        if (t.status !== "waiting") changeStatus(t, "waiting");
+        log(t, `Follow-up completed${v.note ? ": " + v.note : ""}. Next follow-up ${fmt(v.next)}`, "followup");
+        persist(t); renderAll(); if (state.openId === t.id) renderPanel();
+        toast("Follow-up recorded", true);
+     } }]);
+}
+
+function emailText(t, lang) {
+  const w = t.waiting || {};
+  const comp = (t.companies || []).map(company).filter(Boolean).map(c => c.name).join(", ");
+  const sig = state.settings.signature || "";
+  const what = w.what || t.title;
+  if (lang === "de") return `Betreff: Nachfrage – ${what}
+
+Guten Tag${w.who ? " " + w.who : ""},
+
+ich komme auf meine Nachricht${w.contactedOn ? " vom " + fmtDE(w.contactedOn) : ""} bezüglich ${what}${comp ? " (" + comp + ")" : ""} zurück.
+
+Könnten Sie mir bitte den aktuellen Stand mitteilen oder ob Sie noch weitere Unterlagen von uns benötigen?
+
+Vielen Dank im Voraus.
+
+Mit freundlichen Grüßen
+${sig}`;
+  return `Subject: Follow-up – ${what}
+
+Hello${w.who ? " " + w.who : ""},
+
+I'm following up on my message${w.contactedOn ? " of " + fmtLong(w.contactedOn) : ""} regarding ${what}${comp ? " for " + comp : ""}.
+
+Could you let me know the current status, or whether you need anything further from us?
+
+Thank you in advance.
+
+Kind regards,
+${sig}`;
+}
+
+function emailTemplate(t) {
+  const form = modal(`<h2>Follow-up email</h2>
+    <div class="seg" style="max-width:220px"><button type="button" data-lang="en" class="on">English</button><button type="button" data-lang="de">Deutsch</button></div>
+    <label class="f">Edit before copying<textarea name="body">${esc(emailText(t, "en"))}</textarea></label>`,
+    [{ label: "Close", cls: "ghost" },
+     { label: "Open in email app", onClick: v => {
+        const [first, ...rest] = v.body.split("\n");
+        const subj = first.replace(/^(Subject|Betreff):\s*/i, "");
+        location.href = `mailto:?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(rest.join("\n").trim())}`;
+        return false;
+     } },
+     { label: "Copy", cls: "primary", primary: true, onClick: v => { copyText(v.body); return false; } }]);
+  form.querySelectorAll("[data-lang]").forEach(b => b.addEventListener("click", () => {
+    form.querySelectorAll("[data-lang]").forEach(x => x.classList.toggle("on", x === b));
+    form.querySelector("textarea").value = emailText(t, b.dataset.lang);
+  }));
+}
+function copyText(s) {
+  const done = () => toast("Copied to clipboard");
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(s).then(done, fallback); else fallback();
+  function fallback() { const ta = $("#modal textarea"); ta.select(); document.execCommand("copy"); done(); }
+}
+
+function confirmDelete(t) {
+  modal(`<h2>Delete this task?</h2><p>“${esc(t.title)}” and its checklist will be removed. You can undo right after.</p>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Delete", cls: "primary", primary: true, onClick: () => {
+        pushUndo(`delete “${t.title}”`, t);
+        removeTasks([t.id]); closePanel(); renderAll();
+        toast("Task deleted", true);
+     } }]);
+}
+
+function confirmRemoveExamples() {
+  const ex = [...state.tasks.values()].filter(t => t.example);
+  modal(`<h2>Remove example tasks?</h2><p>This removes the ${ex.length} tasks marked “Example”. Your own tasks are not affected. You can undo right after.</p>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Remove examples", cls: "primary", primary: true, onClick: () => {
+        pushUndo("remove example tasks", ex);
+        removeTasks(ex.map(t => t.id)); closePanel(); renderAll();
+        toast("Example tasks removed", true);
+     } }]);
+}
+
+/* ================================================================
+   12. TOAST
+   ================================================================ */
+let toastTimer;
+function toast(msg, withUndo = false) {
+  toastAction(msg, withUndo ? "Undo" : null, withUndo ? undo : null);
+}
+function toastAction(msg, label, fn) {
+  const el = $("#toast");
+  el.innerHTML = `<span>${esc(msg)}</span>${label ? `<button>${esc(label)}</button>` : ""}`;
+  el.hidden = false;
+  if (label) el.querySelector("button").onclick = () => { el.hidden = true; fn(); };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.hidden = true, label ? 7000 : 2500);
+}
+
+/* ================================================================
+   13. GLOBAL EVENTS & BOOT
+   ================================================================ */
+function wireGlobal() {
+  document.addEventListener("click", e => {
+    const f = e.target.closest("[data-filter]");
+    if (f) { const k = f.dataset.filter; state.filter = k && state.filter !== k ? k : null; renderAll(); return; }
+    const p = e.target.closest("[data-open]");
+    if (p) { openPanel(p.dataset.open); return; }
+    const ed = e.target.closest("[data-edit]");
+    if (ed) { e.stopPropagation(); startInlineRename(ed.dataset.edit); return; }
+    const add = e.target.closest("[data-add]");
+    if (add) { openQuickAdd(add.dataset.add); return; }
+    const card = e.target.closest(".card");
+    if (card && Date.now() - lastDragEnd > 250 && card.querySelector("[contenteditable=true]") === null) openPanel(card.dataset.id);
+  });
+  $("#board").addEventListener("submit", e => {
+    e.preventDefault();
+    const f = e.target.closest(".quick-add"); if (!f) return;
+    const inp = f.querySelector("input"), v = inp.value.trim();
+    if (v) { createTask(v, f.dataset.qa); inp.value = ""; inp.focus(); toast(`Added “${v}”`, true); }
+  });
+  $("#board").addEventListener("keydown", e => {
+    if (e.key === "Escape" && e.target.closest(".quick-add")) e.target.closest(".quick-add").hidden = true;
+  });
+  $("#board").addEventListener("focusout", e => {
+    const f = e.target.closest?.(".quick-add");
+    if (f && !e.target.value.trim()) setTimeout(() => { if (!f.contains(document.activeElement)) f.hidden = true; }, 150);
+  });
+  $("#newTask").onclick = () => openQuickAdd("todo");
+  $("#undoBtn").onclick = undo;
+  $("#removeExamples").onclick = confirmRemoveExamples;
+  $("#scrim").onclick = closePanel;
+  document.addEventListener("keydown", e => {
+    const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+    if (e.key === "Escape") { if (!$("#modal").hidden) closeModal(); else if (state.openId) closePanel(); }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !typing && !e.shiftKey) { e.preventDefault(); undo(); }
+  });
+  // Re-evaluate overdue follow-ups when the date rolls over or the tab regains focus.
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) renderAll(); });
+  setInterval(renderAll, 10 * 60 * 1000);
+}
+
+let started = false;
+function start() {
+  if (started) return; started = true;
+  $("#login").hidden = true;
+  $("#app").hidden = false;
+  buildBoard(); wireGlobal(); wirePanel();
+  store.subscribe(
+    tasks => {
+      state.tasks = new Map(tasks.map(t => [t.id, t]));
+      renderAll();
+      // Refresh the open panel only when the user isn't typing in it.
+      if (state.openId && !$("#panel").contains(document.activeElement)) renderPanel();
+    },
+    settings => { state.settings = { ...DEFAULT_SETTINGS, ...settings }; renderAll(); },
+    err => { console.error(err); toast("Connection problem: " + err.message); }
+  );
+  setSaveState();
+}
+
+async function boot() {
+  if (!window.Sortable) { document.body.innerHTML = "<p style='padding:20px'>Could not load the drag-and-drop library. Check your internet connection and reload.</p>"; return; }
+  if (!firebaseConfig.apiKey) {
+    store = localStore();
+    await store.init();
+    const b = $("#banner");
+    b.hidden = false;
+    b.textContent = "Local demo mode: tasks are saved in this browser only. Add your Firebase config (see README) for secure sign-in and cloud storage.";
+    start();
+    return;
+  }
+  try { store = await firebaseStore(); }
+  catch (e) { $("#login").hidden = false; $("#loginErr").textContent = "Could not load Firebase: " + e.message; return; }
+  $("#signout").hidden = false;
+  $("#signout").onclick = () => store.signOut().then(() => location.reload());
+  $("#signin").onclick = () => store.signIn().catch(e => $("#loginErr").textContent = e.message);
+  store.onAuth(async user => {
+    if (!user) { $("#app").hidden = true; $("#login").hidden = false; return; }
+    try { await store.init(); start(); }
+    catch (e) {
+      $("#login").hidden = false; $("#app").hidden = true;
+      $("#loginErr").textContent = e.code === "permission-denied"
+        ? `${user.email} does not have access. Add it to the allowed list in firestore.rules.`
+        : e.message;
+      store.signOut();
+    }
+  });
+}
+boot();
+</script>
+</body>
+</html>

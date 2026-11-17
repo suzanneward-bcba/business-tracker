@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// For Phase 2 document uploads. Files are private: only the listed
+// accounts can read or upload. Nothing is publicly accessible.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAllowed() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in [
+          'suzanneward@adaptability.co'
+        ];
+    }
+
+    match /workspaces/{workspaceId}/{allPaths=**} {
+      allow read, write: if isAllowed()
+        && (request.resource == null || request.resource.size < 25 * 1024 * 1024);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
