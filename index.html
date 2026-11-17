@@ -146,6 +146,45 @@ label.f input,label.f select,label.f textarea{font-size:15.5px;color:var(--ink);
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#2b2925;color:#fff;border-radius:12px;padding:10px 12px 10px 16px;display:flex;gap:14px;align-items:center;z-index:50;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:15px;max-width:calc(100vw - 30px)}
 .toast button{background:#fff;color:#2b2925;border:0;border-radius:8px;padding:5px 12px;font-weight:600;cursor:pointer}
 
+/* Card extras */
+.card .status-line{font-size:12.5px;color:var(--muted);margin:-2px 0 6px}
+.card .row{font-size:14px;margin:2px 0}
+.card .row b{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
+.card .warn{font-size:13px;font-weight:600;color:var(--danger);background:var(--danger-soft);border-radius:8px;padding:3px 8px;margin:4px 0 6px;display:inline-block}
+.card .warn.today{color:#7a3e06;background:var(--warn-soft)}
+.pct{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;color:var(--muted)}
+.pct .minibar{flex:1;margin:0}
+.chip.dec{background:#e3edf9;color:#24507f;font-weight:600}
+
+/* Decision + notes */
+.toggle{display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer}
+.toggle input{width:20px;height:20px;accent-color:var(--accent)}
+.notes-list{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:6px}
+.notes-list li{background:#faf9f6;border-radius:8px;padding:8px 10px;font-size:14.5px}
+.notes-list .nm{font-size:12.5px;color:var(--muted);margin-bottom:2px}
+.add-note{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.add-note select{padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.add-note input{flex:1;min-width:180px;padding:8px 10px;border:1px dashed #cfc9bd;border-radius:8px}
+
+/* Weekly review */
+.btn.review-btn{background:#fff;border:2px solid var(--accent);color:var(--accent);font-weight:650}
+.review{position:fixed;inset:0;background:var(--bg);z-index:15;overflow-y:auto}
+.review-inner{max-width:1100px;margin:0 auto;padding:18px 20px 60px}
+.review-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.review-head h1{flex:1;margin:0;font-size:24px}
+.review section{margin-top:22px}
+.review section > h2{font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.review section > h2 .n{font-size:13px;background:#fff;border-radius:999px;padding:1px 9px;color:var(--muted);font-weight:600}
+.review section > p{margin:0 0 10px;font-size:14px;color:var(--muted)}
+.ritem{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:10px;border-left:5px solid var(--c,#c9c4ba)}
+.ritem h3{margin:0 0 6px;font-size:17px;cursor:pointer}
+.ritem h3:hover{text-decoration:underline}
+.rgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 16px;font-size:14px}
+@media (max-width:700px){.rgrid{grid-template-columns:1fr}}
+.rgrid .lb{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;display:block}
+.ractions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.rempty{color:var(--muted);font-size:14.5px;padding:10px 14px;border:1.5px dashed #d6d1c7;border-radius:10px}
+
 /* Login */
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .login .box{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:var(--shadow);text-align:center}
@@ -171,6 +210,7 @@ footer.disc{padding:0 20px 24px;font-size:12.5px;color:var(--muted)}
     <span id="saveState" class="save-state"></span>
     <button id="undoBtn" class="btn" disabled title="Undo (Ctrl/Cmd+Z)">↶ Undo</button>
     <button id="removeExamples" class="btn ghost small" hidden>Remove example tasks</button>
+    <button id="reviewBtn" class="btn review-btn">☰ Weekly Review</button>
     <button id="newTask" class="btn primary">+ New task</button>
     <button id="signout" class="btn ghost small" hidden>Sign out</button>
   </header>
@@ -189,6 +229,7 @@ footer.disc{padding:0 20px 24px;font-size:12.5px;color:var(--muted)}
   <footer class="disc">Workflow checklists and example tasks are organizational aids only, not legal or tax instructions. Verify regulatory requirements and tax treatment with the appropriate professional.</footer>
 </div>
 
+<div id="review" class="review" hidden></div>
 <div id="scrim" class="scrim" hidden></div>
 <aside id="panel" class="panel" hidden aria-label="Task details"></aside>
 <div id="modal" class="modal" hidden></div>
@@ -249,6 +290,7 @@ const pad = n => String(n).padStart(2, "0");
 const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const today = () => ymd(new Date());
 const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d); };
+const daysAgoIso = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString(); };
 const parseYmd = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 const daysFromToday = s => Math.round((parseYmd(s) - parseYmd(today())) / 86400000);
 const fmt = s => s ? parseYmd(s).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
@@ -279,10 +321,13 @@ function newTask(fields = {}) {
     status: "todo",
     order: 0,
     steps: [],                  // {id, text, done, doneAt}
-    waiting: { who: "", what: "", contactedOn: "", followUpOn: "", expectedResponseOn: "" },
+    // dismissedFor: the follow-up date whose reminder the user dismissed (no repeat reminder for that date)
+    waiting: { who: "", what: "", contactedOn: "", followUpOn: "", expectedResponseOn: "", respondedOn: "", dismissedFor: "" },
+    decisionNeeded: false,
+    decisionNote: "",
     contacts: [],               // Phase 2: {name, role, email, phone, lastContactOn, expectedResponseOn, nextFollowUpOn}
     documents: [],              // Phase 2: {name, url, storagePath, required, state: requested|received|submitted|approved}
-    notes: [],                  // Phase 2: {id, at, kind: call|meeting|email|note, text}
+    notes: [],                  // append-only: {id, at, kind: call|meeting|email|note, text}
     history: [{ at: now, type: "created", text: "Task created" }],
     example: false,
     createdAt: now,
@@ -332,9 +377,12 @@ function sampleTasks() {
         steps: mkSteps(["Agree process with Steuerberater", "Choose receipt collection method", "Set monthly bookkeeping routine", "Document the process"]) }),
     T({ title: "Organize tax and insurance records", companies: ["general"], category: "Insurance",
         priority: "Low", status: "todo",
+        // Backdated so the Weekly Review shows how a stalled task looks.
+        createdAt: daysAgoIso(12), history: [{ at: daysAgoIso(12), type: "created", text: "Task created" }],
         steps: mkSteps(["Create folder structure per entity", "Gather existing policies", "Gather tax correspondence", "Record renewal or review dates"]) }),
     T({ title: "Schedule financial advisor follow-up", companies: ["general"], category: "Banking and Finance",
         status: "attention", dueDate: addDays(2),
+        decisionNeeded: true, decisionNote: "Decide which topics to cover and whether to meet before year-end",
         steps: mkSteps(["Decide which topics to cover", "Propose meeting times", "Confirm appointment"]) }),
     T({ title: "Review upcoming administrative deadlines", companies: ["general"], category: "Government and Regulatory Administration",
         status: "todo", dueDate: addDays(10),
@@ -463,20 +511,34 @@ function undo() {
    7. DERIVED VIEWS
    ================================================================ */
 const company = id => state.settings.companies.find(c => c.id === id);
-const isFollowUpOverdue = t => t.status === "waiting" && !!t.waiting?.followUpOn && t.waiting.followUpOn < today();
-const isFollowUpToday = t => t.status === "waiting" && t.waiting?.followUpOn === today();
+// A follow-up reminder is "due" from its date onward, while the task is Waiting on Others,
+// unless the user dismissed the reminder for that exact date (no duplicate reminders).
+const isFollowUpDue = t => t.status === "waiting" && !!t.waiting?.followUpOn
+  && t.waiting.followUpOn <= today() && t.waiting.dismissedFor !== t.waiting.followUpOn;
+const isFollowUpOverdue = t => isFollowUpDue(t) && t.waiting.followUpOn < today();
 const isDueOverdue = t => t.status !== "done" && !!t.dueDate && t.dueDate < today();
-// Overdue follow-ups are SHOWN in Needs Attention but keep status "waiting".
-const colOf = t => isFollowUpOverdue(t) ? "attention" : t.status;
+// Due follow-ups are SHOWN in Needs Attention but keep status "waiting" and their progress.
+const colOf = t => isFollowUpDue(t) ? "attention" : t.status;
 const openSteps = t => (t.steps || []).filter(s => !s.done);
+const progressPct = t => { const s = t.steps || []; return s.length ? Math.round(s.filter(x => x.done).length / s.length * 100) : null; };
 const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
 const thisMonth = () => today().slice(0, 7);
+// Activity = status change, step checked, note added, follow-up/response recorded (and creation).
+const ACTIVITY_TYPES = new Set(["created", "status", "step", "note", "followup", "response"]);
+function lastActivity(t) {
+  const times = (t.history || []).filter(h => ACTIVITY_TYPES.has(h.type)).map(h => h.at)
+    .concat((t.notes || []).map(n => n.at), t.createdAt || []);
+  return times.sort().pop() || null;
+}
+const isStalled = t => { if (t.status === "done") return false; const a = lastActivity(t); return !!a && (Date.now() - new Date(a)) > 7 * 86400000; };
+const needsDecision = t => t.status !== "done" && (t.decisionNeeded || (t.status === "attention"));
+const daysLabel = s => { const d = daysFromToday(s); return d === 0 ? "today" : d < 0 ? `${-d}d overdue` : `in ${d}d`; };
 
 const FILTERS = {
   open:     { label: "Open tasks",           test: t => t.status !== "done" },
   progress: { label: "In progress",          test: t => t.status === "progress" },
   waiting:  { label: "Waiting on others",    test: t => t.status === "waiting" },
-  overdue:  { label: "Overdue follow-ups",   test: isFollowUpOverdue },
+  overdue:  { label: "Follow-ups due",       test: isFollowUpDue },
   month:    { label: "Completed this month", test: t => t.status === "done" && (t.completedAt || "").slice(0, 7) === thisMonth() },
 };
 
@@ -487,7 +549,8 @@ function priorityList() {
     let score = 0, why = "", red = false;
     if (isFollowUpOverdue(t)) { score = 100 - daysFromToday(t.waiting.followUpOn); why = `Follow-up ${-daysFromToday(t.waiting.followUpOn)}d overdue`; red = true; }
     else if (isDueOverdue(t)) { score = 90; why = "Past due date"; red = true; }
-    else if (isFollowUpToday(t)) { score = 85; why = "Follow up today"; }
+    else if (isFollowUpDue(t)) { score = 85; why = "Follow up today"; }
+    else if (t.decisionNeeded) { score = 82; why = "Decision needed"; }
     else if (t.status === "attention") { score = 80; why = "Needs attention"; }
     else if (t.priority === "Urgent") { score = 70; why = "Urgent"; red = true; }
     else if (t.dueDate && daysFromToday(t.dueDate) <= 3) { score = 60 - daysFromToday(t.dueDate); why = daysFromToday(t.dueDate) === 0 ? "Due today" : `Due in ${daysFromToday(t.dueDate)}d`; }
@@ -506,7 +569,7 @@ function renderTiles() {
     ["open", "Open tasks", all.filter(FILTERS.open.test).length],
     ["progress", "In progress", all.filter(FILTERS.progress.test).length],
     ["waiting", "Waiting on others", all.filter(FILTERS.waiting.test).length],
-    ["overdue", "Overdue follow-ups", all.filter(FILTERS.overdue.test).length],
+    ["overdue", "Follow-ups due", all.filter(FILTERS.overdue.test).length],
     ["month", "Completed this month", all.filter(FILTERS.month.test).length],
   ];
   $("#tiles").innerHTML = tiles.map(([k, label, n]) =>
@@ -529,35 +592,40 @@ function renderPriorities() {
 
 function cardHTML(t) {
   const comps = (t.companies || []).map(company).filter(Boolean);
-  const steps = t.steps || [], done = steps.filter(s => s.done).length;
+  const pct = progressPct(t);
   const next = openSteps(t)[0];
+  const w = t.waiting || {};
   const chips = comps.map(c => `<span class="chip" style="--cs:${c.soft}">${esc(c.short || c.name)}</span>`).join("")
     + (t.priority === "High" || t.priority === "Urgent" ? `<span class="chip pri-${t.priority}">${t.priority}</span>` : "")
+    + (t.decisionNeeded && t.status !== "done" ? `<span class="chip dec">Decision needed</span>` : "")
     + (t.example ? `<span class="chip ex">Example</span>` : "");
-  let flag = "";
-  if (isFollowUpOverdue(t)) flag = `<div class="flag">⚑ Follow-up overdue · still Waiting on Others</div>`;
-  const meta = [];
-  if (t.status === "waiting" && t.waiting?.followUpOn && !isFollowUpOverdue(t)) {
-    const d = daysFromToday(t.waiting.followUpOn);
-    meta.push(`<span class="${d <= 1 ? "soon" : ""}">↻ Follow up ${d === 0 ? "today" : fmt(t.waiting.followUpOn)}</span>`);
+  // Shown when the card sits in a column other than its real status (a due follow-up).
+  const statusLine = colOf(t) !== t.status ? `<div class="status-line">Status: ${STATUS_NAME[t.status]}</div>` : "";
+  const rows = [];
+  if (t.status === "waiting" && w.who) rows.push(`<div class="row"><b>Waiting on</b>${esc(w.who)}</div>`);
+  if (t.status !== "done") {
+    const action = next ? esc(next.text) : t.status === "waiting" && w.what ? `Receive: ${esc(w.what)}` : `<i class="muted">Add a first step</i>`;
+    rows.push(`<div class="next"><span>Next</span>${action}</div>`);
   }
+  let warn = "";
+  if (t.status === "waiting" && w.followUpOn) {
+    if (isFollowUpOverdue(t)) warn = `<span class="warn">⚑ Follow-up ${daysLabel(w.followUpOn)} · ${fmt(w.followUpOn)}</span>`;
+    else if (isFollowUpDue(t)) warn = `<span class="warn today">↻ Follow up today</span>`;
+  }
+  const meta = [];
+  if (t.status === "waiting" && w.followUpOn && !isFollowUpDue(t)) meta.push(`<span>↻ Follow-up ${fmt(w.followUpOn)}</span>`);
   if (t.dueDate && t.status !== "done") {
     const late = isDueOverdue(t), soon = !late && daysFromToday(t.dueDate) <= 3;
     meta.push(`<span class="${late ? "late" : soon ? "soon" : ""}">📅 ${late ? "Overdue · " : ""}${fmt(t.dueDate)}</span>`);
   }
-  const contact = t.waiting?.who || t.contacts?.[0]?.name || "";
-  if (contact) meta.push(`<span>👤 ${esc(contact)}</span>`);
-  if (steps.length) meta.push(`<span>${done}/${steps.length} steps</span>`);
-  const nextLine = t.status === "done" ? "" :
-    t.status === "waiting" && t.waiting?.what ? `<div class="next"><span>Waiting for</span>${esc(t.waiting.what)}</div>` :
-    `<div class="next"><span>Next</span>${next ? esc(next.text) : `<i class="muted">Add a first step</i>`}</div>`;
+  if (t.status !== "waiting" && t.contacts?.[0]?.name) meta.push(`<span>👤 ${esc(t.contacts[0].name)}</span>`);
   return `<article class="card ${t.status === "done" ? "done" : ""}" data-id="${t.id}" style="--c:${comps[0]?.color || "#c9c4ba"}">
     <button class="edit-title" data-edit="${t.id}" title="Rename" aria-label="Rename task">✎</button>
     <div class="card-top">${chips}</div>
     <h3 class="card-title">${esc(t.title)}</h3>
-    ${flag}${nextLine}
+    ${statusLine}${warn}${rows.join("")}
     ${meta.length ? `<div class="meta">${meta.join("")}</div>` : ""}
-    ${steps.length ? `<div class="minibar"><i style="width:${Math.round(done / steps.length * 100)}%"></i></div>` : ""}
+    ${pct !== null ? `<div class="pct"><div class="minibar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>` : ""}
   </article>`;
 }
 
@@ -595,7 +663,7 @@ function renderBoard() {
   sortables.forEach(s => s.option("disabled", !!state.filter));
 }
 
-function renderAll() { renderTiles(); renderPriorities(); renderBoard(); }
+function renderAll() { renderTiles(); renderPriorities(); renderBoard(); if (!$("#review").hidden) renderReview(); }
 
 /* ================================================================
    9. BOARD INTERACTIONS
@@ -700,8 +768,9 @@ function renderPanel() {
   const pct = steps.length ? Math.round(done / steps.length * 100) : 0;
   const w = t.waiting || {};
   const showWait = t.status === "waiting" || w.who || w.what || w.followUpOn;
-  const overdue = isFollowUpOverdue(t);
+  const overdue = isFollowUpDue(t);
   const cats = state.settings.categories;
+  const NOTE_KINDS = { call: "📞 Call", meeting: "👥 Meeting", email: "✉ Email", note: "📝 Note" };
   const scrollTop = $("#panel .panel-body")?.scrollTop || 0;
 
   $("#panel").innerHTML = `
@@ -709,7 +778,7 @@ function renderPanel() {
     <select data-field="status" aria-label="Status" style="padding:7px 10px;border-radius:8px;border:1px solid var(--line);font-weight:600">
       ${COLS.map(c => `<option value="${c.id}" ${t.status === c.id ? "selected" : ""}>${c.name}</option>`).join("")}
     </select>
-    ${overdue ? `<span class="chip pri-Urgent">Follow-up overdue</span>` : ""}
+    ${overdue ? `<span class="chip pri-Urgent">Follow-up ${daysLabel(w.followUpOn)}</span>` : ""}
     <span class="spacer"></span>
     <button class="btn ghost small" data-act="close" aria-label="Close">✕ Close</button>
   </div>
@@ -736,6 +805,10 @@ function renderPanel() {
         <label class="f">Priority
           <div class="seg">${PRIORITIES.map(p => `<button type="button" data-priority="${p}" class="${t.priority === p ? "on" : ""}">${p}</button>`).join("")}</div></label>
       </div>
+      <div style="margin-top:12px">
+        <label class="toggle"><input type="checkbox" data-field="decisionNeeded" ${t.decisionNeeded ? "checked" : ""}> Needs a decision before moving forward</label>
+        ${t.decisionNeeded ? `<label class="f" style="margin-top:6px">What needs deciding?<input data-field="decisionNote" value="${esc(t.decisionNote)}" placeholder="e.g. Choose between two banks"></label>` : ""}
+      </div>
     </div>
 
     ${showWait ? `
@@ -748,17 +821,20 @@ function renderPanel() {
           <label class="f">Last contacted<input type="date" data-wait="contactedOn" value="${esc(w.contactedOn)}"></label>
           <label class="f">Expected response by<input type="date" data-wait="expectedResponseOn" value="${esc(w.expectedResponseOn)}"></label>
           <label class="f">Next follow-up<input type="date" data-wait="followUpOn" value="${esc(w.followUpOn)}"></label>
+          ${w.respondedOn ? `<label class="f">Last response received<input type="date" data-wait="respondedOn" value="${esc(w.respondedOn)}"></label>` : ""}
         </div>
         <div class="actions">
           <button class="btn primary" data-act="followup">✓ Follow Up Completed</button>
+          <button class="btn" data-act="response">⇠ Response Received</button>
           <button class="btn" data-act="email">✉ Follow-up email</button>
+          ${overdue ? `<button class="btn" data-act="snooze">Postpone</button><button class="btn ghost" data-act="dismiss">Dismiss reminder</button>` : ""}
         </div>
       </div>
     </div>` : ""}
 
     <div class="section">
       <h3>Workflow checklist</h3>
-      <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${done} of ${steps.length} done</span></div>
+      <div class="progress"><div class="bar"><i style="width:${pct}%"></i></div><span>${pct}% · ${done} of ${steps.length} steps</span></div>
       ${steps.length ? `<div class="curnext">
         <div><span class="muted">Current step:</span> <b>${open[0] ? esc(open[0].text) : "All steps complete ✓"}</b></div>
         ${open[1] ? `<div><span class="muted">Then:</span> ${esc(open[1].text)}</div>` : ""}
@@ -774,8 +850,18 @@ function renderPanel() {
       <form class="add-step" id="addStep"><input placeholder="Add a step, then Enter" aria-label="New step"><button class="btn small">Add</button></form>
     </div>
 
+    <div class="section">
+      <h3>Notes</h3>
+      <form class="add-note" id="addNote">
+        <select name="kind" aria-label="Note type">${Object.entries(NOTE_KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
+        <input name="text" placeholder="What happened? e.g. Spoke to bank, documents accepted" aria-label="Note text">
+        <button class="btn small">Add note</button>
+      </form>
+      <ul class="notes-list">${[...(t.notes || [])].reverse().map(n => `<li><div class="nm">${NOTE_KINDS[n.kind] || "📝 Note"} · ${fmtStamp(n.at)}</div>${esc(n.text)}</li>`).join("") || `<li class="muted">No notes yet.</li>`}</ul>
+    </div>
+
     <div class="section history">
-      <details><summary>Activity history (${(t.history || []).length})</summary>
+      <details><summary>Activity history (${(t.history || []).length}) · last activity ${lastActivity(t) ? fmtStamp(lastActivity(t)) : "—"}</summary>
         <ul>${[...(t.history || [])].reverse().map(h => `<li><time>${fmtStamp(h.at)}</time><span>${esc(h.text)}</span></li>`).join("")}</ul>
       </details>
     </div>
@@ -809,7 +895,7 @@ function wirePanel() {
   P.addEventListener("input", e => {
     const t = current(); if (!t) return;
     const el = e.target;
-    if (el.dataset.field === "title" || el.dataset.field === "responsible") {
+    if (["title", "responsible", "decisionNote"].includes(el.dataset.field)) {
       t[el.dataset.field] = el.dataset.field === "title" ? el.value.replace(/\n/g, " ") : el.value;
       saveSoon(t);
     } else if (el.dataset.wait && el.type !== "date") {
@@ -828,6 +914,11 @@ function wirePanel() {
       if (el.value === "waiting" && prev !== "waiting") openWaitingPrompt(t);
     } else if (el.dataset.field === "category" || el.dataset.field === "dueDate") {
       t[el.dataset.field] = el.value; persist(t); renderAll();
+    } else if (el.dataset.field === "decisionNeeded") {
+      t.decisionNeeded = el.checked;
+      log(t, el.checked ? "Marked as needing a decision" : "Decision no longer needed", "info");
+      persist(t); renderAll(); renderPanel();
+      if (el.checked) setTimeout(() => $('#panel [data-field="decisionNote"]')?.focus(), 30);
     } else if (el.dataset.wait && el.type === "date") {
       t.waiting = { ...(t.waiting || {}), [el.dataset.wait]: el.value };
       if (el.dataset.wait === "followUpOn") log(t, el.value ? `Follow-up date set to ${fmt(el.value)}` : "Follow-up date cleared", "followup");
@@ -838,11 +929,8 @@ function wirePanel() {
       s.done = el.checked; s.doneAt = el.checked ? new Date().toISOString() : null;
       log(t, `${el.checked ? "Completed" : "Reopened"} step: ${s.text}`, "step");
       persist(t); renderAll(); renderPanel();
-      if (el.checked && t.steps.every(x => x.done) && t.status !== "done") {
-        toastAction("All steps done. Mark task completed?", "Complete", () => {
-          pushUndo(`complete “${t.title}”`, t); changeStatus(t, "done"); persist(t); renderAll(); renderPanel();
-        });
-      }
+      // Checking steps never moves the task; only offer to complete it.
+      if (el.checked && t.steps.every(x => x.done) && t.status !== "done") promptComplete(t);
     }
   });
   P.addEventListener("click", e => {
@@ -860,12 +948,21 @@ function wirePanel() {
       toast("Step removed", true);
     } else if (b.dataset.act === "close") closePanel();
     else if (b.dataset.act === "followup") followUpCompleted(t);
+    else if (b.dataset.act === "response") responseReceived(t);
+    else if (b.dataset.act === "snooze") snoozeFollowUp(t);
+    else if (b.dataset.act === "dismiss") dismissReminder(t);
     else if (b.dataset.act === "email") emailTemplate(t);
     else if (b.dataset.act === "delete") confirmDelete(t);
   });
   P.addEventListener("submit", e => {
     e.preventDefault();
     const t = current(); if (!t) return;
+    if (e.target.id === "addNote") {
+      const text = e.target.text.value.trim(); if (!text) return;
+      addNote(t, e.target.kind.value, text);
+      renderAll(); renderPanel();
+      return;
+    }
     const inp = e.target.querySelector("input"), v = inp.value.trim();
     if (!v) return;
     (t.steps ||= []).push({ id: uid(), text: v, done: false, doneAt: null });
@@ -903,34 +1000,126 @@ function openWaitingPrompt(t) {
     <label class="f">Who are we waiting for?<input name="who" value="${esc(w.who)}" placeholder="e.g. Bank, Steuerberater, notary"></label>
     <label class="f">What are we waiting for?<input name="what" value="${esc(w.what)}" placeholder="e.g. Account approval"></label>
     <div class="grid2">
-      <label class="f">When did we contact them?<input type="date" name="contactedOn" value="${esc(w.contactedOn || today())}"></label>
-      <label class="f">When should we follow up?<input type="date" name="followUpOn" value="${follow}"></label>
+      <label class="f">Date of last contact<input type="date" name="contactedOn" value="${esc(w.contactedOn || today())}"></label>
+      <label class="f">Expected response date<input type="date" name="expectedResponseOn" value="${esc(w.expectedResponseOn && w.expectedResponseOn >= today() ? w.expectedResponseOn : "")}"></label>
+      <label class="f">Next follow-up date<input type="date" name="followUpOn" value="${follow}"></label>
     </div>`,
     [{ label: "Skip", cls: "ghost" },
      { label: "Save", cls: "primary", primary: true, onClick: v => {
-        t.waiting = { ...(t.waiting || {}), ...v };
+        t.waiting = { ...(t.waiting || {}), ...v, dismissedFor: "" };
         log(t, `Waiting on ${v.who || "others"}${v.what ? " for " + v.what : ""}${v.followUpOn ? `; follow up ${fmt(v.followUpOn)}` : ""}`, "followup");
         persist(t); renderAll(); if (state.openId === t.id) renderPanel();
      } }]);
 }
 
+const refreshAfter = t => { renderAll(); if (state.openId === t.id) renderPanel(); };
+
+// Notes are append-only: never edited or removed by any workflow action.
+function addNote(t, kind, text) {
+  const n = { id: uid(), at: new Date().toISOString(), kind: kind || "note", text };
+  (t.notes ||= []).push(n);
+  log(t, `Note added: ${text.length > 60 ? text.slice(0, 60) + "…" : text}`, "note");
+  persist(t);
+}
+
 function followUpCompleted(t) {
+  const w = t.waiting || {};
   modal(`<h2>Follow-up completed</h2>
-    <p>Today (${fmtLong(today())}) will be recorded as the last contact date.</p>
+    <p>Today (${fmtLong(today())}) will be recorded as the date of last contact${w.who ? ` with <b>${esc(w.who)}</b>` : ""}.</p>
+    <label class="f">Brief note (optional)<input name="note" placeholder="e.g. Called, left voicemail; emailed reminder"></label>
     <div class="grid2">
-      <label class="f">Expected response by<input type="date" name="exp" value="${addDays(5)}"></label>
-      <label class="f">Next follow-up if no reply<input type="date" name="next" value="${addDays(7)}"></label>
-    </div>
-    <label class="f">Note (optional)<input name="note" placeholder="e.g. Called, left voicemail"></label>`,
+      <label class="f">New follow-up date (optional)<input type="date" name="next" value="${addDays(7)}"></label>
+      <label class="f">Expected response date (optional)<input type="date" name="exp" value="${esc(w.expectedResponseOn && w.expectedResponseOn >= today() ? w.expectedResponseOn : "")}"></label>
+    </div>`,
     [{ label: "Cancel", cls: "ghost" },
      { label: "Save", cls: "primary", primary: true, onClick: v => {
         pushUndo(`follow-up on “${t.title}”`, t);
-        t.waiting = { ...(t.waiting || {}), contactedOn: today(), expectedResponseOn: v.exp, followUpOn: v.next };
+        t.waiting = { ...w, contactedOn: today(), followUpOn: v.next || "", expectedResponseOn: v.exp || w.expectedResponseOn || "", dismissedFor: "" };
         if (t.status !== "waiting") changeStatus(t, "waiting");
-        log(t, `Follow-up completed${v.note ? ": " + v.note : ""}. Next follow-up ${fmt(v.next)}`, "followup");
-        persist(t); renderAll(); if (state.openId === t.id) renderPanel();
+        log(t, `Follow-up completed${w.who ? " with " + w.who : ""}${v.next ? `. Next follow-up ${fmt(v.next)}` : ""}`, "followup");
+        if (v.note.trim()) addNote(t, "note", `Follow-up: ${v.note.trim()}`);
+        persist(t); refreshAfter(t);
         toast("Follow-up recorded", true);
      } }]);
+}
+
+function responseReceived(t) {
+  const w = t.waiting || {};
+  modal(`<h2>Response received</h2>
+    <p class="muted">${w.who ? `From <b>${esc(w.who)}</b>` : "From the other party"}${w.what ? ` about ${esc(w.what)}` : ""}.</p>
+    <label class="f">Response date<input type="date" name="on" value="${today()}"></label>
+    <label class="f">Brief summary (optional)<input name="summary" placeholder="e.g. Bank approved the application, IBAN to follow"></label>
+    <label class="toggle"><input type="checkbox" name="move" ${t.status === "waiting" ? "checked" : ""}> Move task back to In Progress</label>
+    <p class="muted" style="font-size:13.5px">Checklist progress is not changed. Tick off any steps yourself.</p>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Save", cls: "primary", primary: true, onClick: v => {
+        pushUndo(`response on “${t.title}”`, t);
+        // Response clears the pending follow-up reminder; the other details stay on the ticket.
+        t.waiting = { ...w, respondedOn: v.on || today(), followUpOn: "", dismissedFor: "" };
+        log(t, `Response received${w.who ? " from " + w.who : ""} (${fmt(v.on || today())})`, "response");
+        if (v.summary.trim()) addNote(t, "note", `Response: ${v.summary.trim()}`);
+        if (v.move) changeStatus(t, "progress");
+        persist(t); refreshAfter(t);
+        toast("Response recorded", true);
+     } }]);
+}
+
+function snoozeFollowUp(t) {
+  const form = modal(`<h2>Set new follow-up date</h2>
+    <p class="muted">“${esc(t.title)}”</p>
+    <div class="seg" id="snoozeQuick">
+      <button type="button" data-days="2">In 2 days</button><button type="button" data-days="7">Next week</button><button type="button" data-days="14">In 2 weeks</button>
+    </div>
+    <label class="f">Or pick a date<input type="date" name="on" value="${addDays(2)}"></label>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Save", cls: "primary", primary: true, onClick: v => {
+        if (!v.on) return false;
+        pushUndo(`postpone follow-up on “${t.title}”`, t);
+        t.waiting = { ...(t.waiting || {}), followUpOn: v.on, dismissedFor: "" };
+        log(t, `Follow-up postponed to ${fmt(v.on)}`, "followup");
+        persist(t); refreshAfter(t);
+        toast(`Follow-up moved to ${fmt(v.on)}`, true);
+     } }]);
+  form.querySelectorAll("[data-days]").forEach(b => b.addEventListener("click", () => {
+    form.querySelector('[name="on"]').value = addDays(+b.dataset.days);
+    form.querySelectorAll("[data-days]").forEach(x => x.classList.toggle("on", x === b));
+  }));
+}
+
+function dismissReminder(t) {
+  pushUndo(`dismiss reminder on “${t.title}”`, t);
+  t.waiting = { ...(t.waiting || {}), dismissedFor: t.waiting.followUpOn };
+  log(t, `Follow-up reminder for ${fmt(t.waiting.followUpOn)} dismissed`, "info");
+  persist(t); refreshAfter(t);
+  toast("Reminder dismissed. It won't come back for this date.", true);
+}
+
+function noteDialog(t) {
+  modal(`<h2>Add note</h2><p class="muted">“${esc(t.title)}”</p>
+    <label class="f">Type<select name="kind"><option value="call">📞 Call</option><option value="meeting">👥 Meeting</option><option value="email">✉ Email</option><option value="note" selected>📝 Note</option></select></label>
+    <label class="f">Note<input name="text" placeholder="What happened?"></label>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Add note", cls: "primary", primary: true, onClick: v => {
+        if (!v.text.trim()) return false;
+        pushUndo(`note on “${t.title}”`, t);
+        addNote(t, v.kind, v.text.trim()); refreshAfter(t);
+        toast("Note added");
+     } }]);
+}
+
+function promptComplete(t) {
+  modal(`<h2>All steps are checked off</h2>
+    <p>Mark “${esc(t.title)}” as Completed? You can also leave it open if something still needs verifying.</p>`,
+    [{ label: "Leave open", cls: "ghost" },
+     { label: "Mark Completed", cls: "primary", primary: true, onClick: () => setStatus(t, "done") }]);
+}
+
+function setStatus(t, s) {
+  if (t.status === s) return;
+  pushUndo(`move “${t.title}”`, t);
+  changeStatus(t, s);
+  persist(t); refreshAfter(t);
+  toast(`Moved to ${STATUS_NAME[s]}`, true);
 }
 
 function emailText(t, lang) {
@@ -1009,6 +1198,113 @@ function confirmRemoveExamples() {
 }
 
 /* ================================================================
+   11b. WEEKLY REVIEW — built live from task data, nothing to maintain.
+   Each task appears once, in the first section that applies.
+   ================================================================ */
+function reviewSections() {
+  const open = [...state.tasks.values()].filter(t => t.status !== "done");
+  const used = new Set();
+  const take = (test, sort) => {
+    const list = open.filter(t => !used.has(t.id) && test(t)).sort(sort);
+    list.forEach(t => used.add(t.id));
+    return list;
+  };
+  const byDate = f => (a, b) => (f(a) || "9999").localeCompare(f(b) || "9999");
+  return [
+    { key: "followups", title: "Overdue follow-ups", hint: "External contacts whose follow-up date has arrived or passed.",
+      items: take(isFollowUpDue, byDate(t => t.waiting.followUpOn)) },
+    { key: "decisions", title: "Needs a decision", hint: "Tasks marked as needing approval, clarification or a decision, plus tasks in Needs Attention.",
+      items: take(needsDecision, byDate(t => t.dueDate)) },
+    { key: "stalled", title: "Stalled tasks", hint: "Open tasks with no recorded activity in the past 7 days.",
+      items: take(isStalled, byDate(t => lastActivity(t))) },
+    { key: "deadlines", title: "Upcoming deadlines", hint: "Target dates within the next 7 days (or already passed).",
+      items: take(t => t.dueDate && daysFromToday(t.dueDate) <= 7, byDate(t => t.dueDate)) },
+  ];
+}
+
+function reviewItemHTML(t, key) {
+  const comps = (t.companies || []).map(company).filter(Boolean);
+  const steps = t.steps || [], open = openSteps(t), w = t.waiting || {};
+  const stepIx = open[0] ? steps.indexOf(open[0]) + 1 : null;
+  const currentStep = open[0] ? `Step ${stepIx} of ${steps.length}: ${esc(open[0].text)}` : steps.length ? "All steps complete" : "No checklist yet";
+  let nextAction;
+  if (key === "followups") nextAction = `Follow up with ${esc(w.who || "contact")}${w.what ? " re: " + esc(w.what) : ""}`;
+  else if (key === "decisions" && t.decisionNote) nextAction = `Decision: ${esc(t.decisionNote)}`;
+  else if (t.status === "waiting") nextAction = `Await ${esc(w.who || "response")}${w.followUpOn ? ` (follow up ${fmt(w.followUpOn)})` : ""}`;
+  else nextAction = open[0] ? esc(open[0].text) : "Review and decide whether to complete";
+  let date;
+  if (key === "followups") date = `Follow-up ${fmt(w.followUpOn)} <span class="muted">(${daysLabel(w.followUpOn)})</span>`;
+  else if (key === "stalled") date = `Last activity ${fmtStamp(lastActivity(t))}${t.dueDate ? ` · due ${fmt(t.dueDate)}` : ""}`;
+  else if (t.dueDate) date = `Due ${fmt(t.dueDate)} <span class="muted">(${daysLabel(t.dueDate)})</span>`;
+  else if (t.status === "waiting" && w.followUpOn) date = `Follow-up ${fmt(w.followUpOn)}`;
+  else date = `<span class="muted">No date</span>`;
+  const pct = progressPct(t);
+  const A = (act, label, cls = "") => `<button class="btn small ${cls}" data-ract="${act}" data-id="${t.id}">${label}</button>`;
+  const acts = [];
+  if (t.status === "waiting") {
+    acts.push(A("followup", "✓ Follow-Up Completed", "primary"), A("response", "⇠ Response Received"), A("snooze", "Set new follow-up date"));
+    if (isFollowUpDue(t)) acts.push(A("dismiss", "Dismiss reminder", "ghost"));
+  }
+  acts.push(A("note", "Add note"));
+  if (t.status !== "progress") acts.push(A("progress", "Move to In Progress"));
+  acts.push(A("done", "Mark Completed"), A("open", "Open ticket", "ghost"));
+  return `<div class="ritem" style="--c:${comps[0]?.color || "#c9c4ba"}">
+    <h3 data-ract="open" data-id="${t.id}">${esc(t.title)}</h3>
+    <div class="rgrid">
+      <div><span class="lb">Company</span>${comps.map(c => esc(c.name)).join(", ") || "—"}</div>
+      <div><span class="lb">Status · progress</span>${STATUS_NAME[t.status]}${pct !== null ? ` · ${pct}%` : ""}</div>
+      <div><span class="lb">Responsible</span>${esc(t.responsible) || "—"}</div>
+      <div><span class="lb">Current workflow step</span>${currentStep}</div>
+      <div><span class="lb">Next required action</span>${nextAction}</div>
+      <div><span class="lb">Due / follow-up</span>${date}</div>
+    </div>
+    <div class="ractions">${acts.join("")}</div>
+  </div>`;
+}
+
+function renderReview() {
+  const secs = reviewSections();
+  const total = secs.reduce((n, s) => n + s.items.length, 0);
+  const R = $("#review");
+  const st = R.scrollTop;
+  R.innerHTML = `<div class="review-inner">
+    <div class="review-head">
+      <h1>Weekly Review</h1>
+      <button class="btn" data-ract="close">← Back to board</button>
+    </div>
+    <p class="muted" style="margin:0">${fmtLong(today())} · ${total ? `${total} item${total === 1 ? "" : "s"} to look at` : "Nothing needs reviewing. Everything is on track."} · Built automatically from your tasks.</p>
+    ${secs.map(s => `<section>
+      <h2>${s.title} <span class="n">${s.items.length}</span></h2>
+      <p>${s.hint}</p>
+      ${s.items.length ? s.items.map(t => reviewItemHTML(t, s.key)).join("") : `<div class="rempty">Nothing here.</div>`}
+    </section>`).join("")}
+  </div>`;
+  R.scrollTop = st;
+}
+function openReview() { closePanel(); $("#review").hidden = false; renderReview(); $("#review").scrollTop = 0; }
+function closeReview() { $("#review").hidden = true; }
+
+function wireReview() {
+  $("#reviewBtn").onclick = openReview;
+  $("#review").addEventListener("click", e => {
+    const b = e.target.closest("[data-ract]"); if (!b) return;
+    const act = b.dataset.ract;
+    if (act === "close") return closeReview();
+    const t = state.tasks.get(b.dataset.id); if (!t) return;
+    ({
+      open: () => openPanel(t.id),
+      followup: () => followUpCompleted(t),
+      response: () => responseReceived(t),
+      snooze: () => snoozeFollowUp(t),
+      dismiss: () => dismissReminder(t),
+      note: () => noteDialog(t),
+      progress: () => setStatus(t, "progress"),
+      done: () => setStatus(t, "done"),
+    })[act]?.();
+  });
+}
+
+/* ================================================================
    12. TOAST
    ================================================================ */
 let toastTimer;
@@ -1059,7 +1355,11 @@ function wireGlobal() {
   $("#scrim").onclick = closePanel;
   document.addEventListener("keydown", e => {
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
-    if (e.key === "Escape") { if (!$("#modal").hidden) closeModal(); else if (state.openId) closePanel(); }
+    if (e.key === "Escape") {
+      if (!$("#modal").hidden) closeModal();
+      else if (state.openId) closePanel();
+      else if (!$("#review").hidden) closeReview();
+    }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !typing && !e.shiftKey) { e.preventDefault(); undo(); }
   });
   // Re-evaluate overdue follow-ups when the date rolls over or the tab regains focus.
@@ -1072,7 +1372,7 @@ function start() {
   if (started) return; started = true;
   $("#login").hidden = true;
   $("#app").hidden = false;
-  buildBoard(); wireGlobal(); wirePanel();
+  buildBoard(); wireGlobal(); wirePanel(); wireReview();
   store.subscribe(
     tasks => {
       state.tasks = new Map(tasks.map(t => [t.id, t]));
