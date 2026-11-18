@@ -110,6 +110,7 @@ label.f input,label.f select,label.f textarea{font-size:15.5px;color:var(--ink);
 .seg button{flex:1;border:0;background:#fff;padding:8px 4px;cursor:pointer;font-size:14px;border-left:1px solid var(--line)}
 .seg button:first-child{border-left:0}
 .seg button.on{background:var(--accent);color:#fff}
+.seg button.on .muted{color:#dbe4f0}
 .waitbox{background:#fbf6ee;border:1px solid #efdfc6;border-radius:12px;padding:12px}
 .waitbox.overdue{background:var(--danger-soft);border-color:#f2c4be}
 .waitbox .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
@@ -185,6 +186,37 @@ label.f input,label.f select,label.f textarea{font-size:15.5px;color:var(--ink);
 .ractions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .rempty{color:var(--muted);font-size:14.5px;padding:10px 14px;border:1.5px dashed #d6d1c7;border-radius:10px}
 
+/* View switch, reminder strip, reminders view */
+.viewseg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.viewseg button{border:0;background:transparent;padding:7px 14px;cursor:pointer;font-weight:500;font-size:15px}
+.viewseg button.on{background:var(--accent);color:#fff}
+.viewseg .badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--danger-soft);color:var(--danger);font-size:12.5px;font-weight:650}
+.viewseg button.on .badge{background:#fff}
+.rem-strip{margin:0 20px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;box-shadow:var(--shadow)}
+.rem-strip .lead{font-size:13px;color:var(--muted);font-weight:600;margin-right:2px}
+.pill{border:0;border-radius:999px;padding:5px 12px;font-size:14px;cursor:pointer;background:var(--warn-soft);color:#7a3e06}
+.pill.late{background:var(--danger-soft);color:var(--danger);font-weight:600}
+.rem-view{padding:0 20px 40px;max-width:980px}
+.rem-view .rv-head{display:flex;align-items:center;gap:10px;margin:4px 0 6px}
+.rem-view .rv-head h2{flex:1;margin:0;font-size:20px}
+.rem-view h3{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 8px;font-weight:650}
+.rrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--surface);border-radius:12px;padding:10px 14px;margin-bottom:8px;box-shadow:var(--shadow);border-left:5px solid var(--c,#c9c4ba)}
+.rrow.sleep{background:transparent;box-shadow:none;border:1px solid var(--line);border-left:5px solid var(--c,#c9c4ba)}
+.rrow .rt{font-weight:600;font-size:16px;cursor:pointer}
+.rrow .rt:hover{text-decoration:underline}
+.rrow .rm{font-size:13.5px;color:var(--muted)}
+.rrow .ra{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.rrow .when{font-size:13.5px;color:var(--muted);white-space:nowrap}
+.chipboxes{display:flex;flex-wrap:wrap;gap:6px}
+.chipboxes label{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:14px;color:var(--ink)}
+.chipboxes input{accent-color:var(--accent)}
+.inline{display:flex;gap:8px;align-items:end}
+.inline > *{flex:1}
+.linkbtn{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font-size:13px;text-decoration:underline}
+.catrow{display:flex;gap:8px;align-items:center}
+.catrow input[type=text]{flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:8px}
+.catrow label{font-size:13px;color:var(--muted);display:flex;gap:4px;align-items:center;white-space:nowrap}
+
 /* Login */
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .login .box{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:var(--shadow);text-align:center}
@@ -207,16 +239,21 @@ footer.disc{padding:0 20px 24px;font-size:12.5px;color:var(--muted)}
 <div id="app" hidden>
   <header class="top">
     <h1>Business Setup & Operations Tracker</h1>
+    <span class="viewseg" role="tablist" aria-label="View">
+      <button data-view="board" class="on">Board</button><button data-view="reminders">Reminders<span class="badge" id="remBadge" hidden></span></button>
+    </span>
     <span id="saveState" class="save-state"></span>
     <button id="undoBtn" class="btn" disabled title="Undo (Ctrl/Cmd+Z)">↶ Undo</button>
     <button id="removeExamples" class="btn ghost small" hidden>Remove example tasks</button>
     <button id="reviewBtn" class="btn review-btn">☰ Weekly Review</button>
+    <button id="newReminder" class="btn">+ Reminder</button>
     <button id="newTask" class="btn primary">+ New task</button>
     <button id="signout" class="btn ghost small" hidden>Sign out</button>
   </header>
   <div id="banner" class="banner" hidden></div>
 
-  <section class="overview">
+  <div id="remStrip" class="rem-strip" hidden></div>
+  <section class="overview" data-boardonly>
     <div class="tiles" id="tiles"></div>
     <div class="priorities">
       <h2>Today's priorities</h2>
@@ -225,7 +262,8 @@ footer.disc{padding:0 20px 24px;font-size:12.5px;color:var(--muted)}
   </section>
   <div id="filterbar" class="filterbar" hidden></div>
 
-  <main class="board" id="board"></main>
+  <main class="board" id="board" data-boardonly></main>
+  <section id="remView" class="rem-view" hidden></section>
   <footer class="disc">Workflow checklists and example tasks are organizational aids only, not legal or tax instructions. Verify regulatory requirements and tax treatment with the appropriate professional.</footer>
 </div>
 
@@ -294,6 +332,7 @@ const daysAgoIso = n => { const d = new Date(); d.setDate(d.getDate() - n); retu
 const parseYmd = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 const daysFromToday = s => Math.round((parseYmd(s) - parseYmd(today())) / 86400000);
 const fmt = s => s ? parseYmd(s).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
+const fmtY = s => s ? fmt(s) + (s.slice(0, 4) !== today().slice(0, 4) ? " " + s.slice(0, 4) : "") : "";
 const fmtLong = s => s ? parseYmd(s).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
 const fmtDE = s => s ? parseYmd(s).toLocaleDateString("de-DE") : "";
 const fmtStamp = iso => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -407,9 +446,14 @@ function localStore() {
         save();
       }
     },
-    subscribe(onTasks, onSettings) { onSettings(data.settings); onTasks(Object.values(data.tasks)); },
+    subscribe(onTasks, onSettings, onError, onReminders) {
+      data.reminders ||= {};
+      onSettings(data.settings); onTasks(Object.values(data.tasks)); onReminders?.(Object.values(data.reminders));
+    },
     async saveTasks(list) { list.forEach(t => data.tasks[t.id] = t); save(); },
     async deleteTasks(ids) { ids.forEach(id => delete data.tasks[id]); save(); },
+    async saveReminders(list) { data.reminders ||= {}; list.forEach(r => data.reminders[r.id] = r); save(); },
+    async deleteReminders(ids) { ids.forEach(id => delete data.reminders[id]); save(); },
     async saveSettings(s) { data.settings = s; save(); },
   };
 }
@@ -427,6 +471,9 @@ async function firebaseStore() {
   } catch { db = F.getFirestore(app); }
   const wsRef = F.doc(db, "workspaces", WORKSPACE_ID);
   const tasksCol = F.collection(wsRef, "tasks");
+  const remCol = F.collection(wsRef, "reminders");
+  const saveIn = async (col, list) => { const b = F.writeBatch(db); list.forEach(x => b.set(F.doc(col, x.id), clone(x))); await b.commit(); };
+  const delIn = async (col, ids) => { const b = F.writeBatch(db); ids.forEach(id => b.delete(F.doc(col, id))); await b.commit(); };
   return {
     mode: "cloud",
     signIn: () => A.signInWithPopup(auth, new A.GoogleAuthProvider()),
@@ -441,20 +488,15 @@ async function firebaseStore() {
         await b.commit();
       }
     },
-    subscribe(onTasks, onSettings, onError) {
+    subscribe(onTasks, onSettings, onError, onReminders) {
       F.onSnapshot(wsRef, s => s.exists() && onSettings(s.data()), onError);
       F.onSnapshot(tasksCol, qs => onTasks(qs.docs.map(d => ({ ...d.data(), id: d.id }))), onError);
+      F.onSnapshot(remCol, qs => onReminders(qs.docs.map(d => ({ ...d.data(), id: d.id }))), onError);
     },
-    async saveTasks(list) {
-      const b = F.writeBatch(db);
-      list.forEach(t => b.set(F.doc(tasksCol, t.id), clone(t)));
-      await b.commit();
-    },
-    async deleteTasks(ids) {
-      const b = F.writeBatch(db);
-      ids.forEach(id => b.delete(F.doc(tasksCol, id)));
-      await b.commit();
-    },
+    saveTasks: list => saveIn(tasksCol, list),
+    deleteTasks: ids => delIn(tasksCol, ids),
+    saveReminders: list => saveIn(remCol, list),
+    deleteReminders: ids => delIn(remCol, ids),
     async saveSettings(s) { await F.setDoc(wsRef, clone(s), { merge: true }); },
   };
 }
@@ -463,7 +505,7 @@ async function firebaseStore() {
    6. STATE & PERSISTENCE
    ================================================================ */
 let store;
-const state = { tasks: new Map(), settings: DEFAULT_SETTINGS, filter: null, openId: null };
+const state = { tasks: new Map(), reminders: new Map(), settings: DEFAULT_SETTINGS, filter: null, openId: null, view: "board" };
 const undoStack = [];
 let pending = 0, saveError = false;
 
@@ -488,6 +530,28 @@ function removeTasks(ids) {
     .then(() => { pending--; setSaveState(); })
     .catch(e => { pending--; saveError = true; setSaveState(); toast("Could not delete: " + e.message); });
 }
+function persistReminders(items) {
+  const list = [].concat(items);
+  const now = new Date().toISOString();
+  list.forEach(r => { r.updatedAt = now; state.reminders.set(r.id, r); });
+  pending++; saveError = false; setSaveState();
+  store.saveReminders(list.map(clone))
+    .then(() => { pending--; setSaveState(); })
+    .catch(e => { pending--; saveError = true; setSaveState(); console.error(e); toast("Could not save: " + e.message); });
+}
+function removeReminders(ids) {
+  ids.forEach(id => state.reminders.delete(id));
+  pending++; setSaveState();
+  store.deleteReminders(ids)
+    .then(() => { pending--; setSaveState(); })
+    .catch(e => { pending--; saveError = true; setSaveState(); toast("Could not delete: " + e.message); });
+}
+function saveSettings() {
+  pending++; setSaveState();
+  store.saveSettings(clone(state.settings))
+    .then(() => { pending--; setSaveState(); })
+    .catch(e => { pending--; saveError = true; setSaveState(); toast("Could not save settings: " + e.message); });
+}
 function log(t, text, type = "info") {
   (t.history ||= []).push({ at: new Date().toISOString(), type, text });
 }
@@ -502,6 +566,8 @@ function undo() {
   if (!u) return;
   if (u.createdIds) removeTasks(u.createdIds);
   if (u.before.length) persist(u.before);
+  if (u.remCreatedIds) removeReminders(u.remCreatedIds);
+  if (u.remBefore?.length) persistReminders(u.remBefore);
   renderAll();
   if (state.openId && state.tasks.has(state.openId)) renderPanel(); else closePanel();
   toast(`Undone: ${u.label}`);
@@ -557,7 +623,7 @@ function priorityList() {
     else if (t.priority === "High" && t.status !== "waiting") { score = 30; why = "High priority"; }
     if (score) out.push({ t, score, why, red });
   }
-  return out.sort((a, b) => b.score - a.score).slice(0, 5);
+  return out.sort((a, b) => b.score - a.score);
 }
 
 /* ================================================================
@@ -584,9 +650,13 @@ function renderTiles() {
 }
 
 function renderPriorities() {
-  const list = priorityList();
+  const rems = dueReminders().map(r => ({ r, score: isRemOverdue(r) ? 95 : 75,
+    why: isRemOverdue(r) ? `Reminder · ${daysLabel(r.dueDate)}` : `Reminder · due ${fmt(r.dueDate)}`, red: isRemOverdue(r) }));
+  const list = [...priorityList(), ...rems].sort((a, b) => b.score - a.score).slice(0, 5);
   $("#priorities").innerHTML = list.length
-    ? list.map(({ t, why, red }) => `<li data-open="${t.id}"><span class="why ${red ? "red" : ""}">${esc(why)}</span><span class="t">${esc(t.title)}</span></li>`).join("")
+    ? list.map(({ t, r, why, red }) => r
+        ? `<li data-rem="${r.id}"><span class="why ${red ? "red" : ""}">${esc(why)}</span><span class="t">${esc(r.title)}</span></li>`
+        : `<li data-open="${t.id}"><span class="why ${red ? "red" : ""}">${esc(why)}</span><span class="t">${esc(t.title)}</span></li>`).join("")
     : `<li class="muted" style="cursor:default">Nothing urgent today.</li>`;
 }
 
@@ -663,7 +733,11 @@ function renderBoard() {
   sortables.forEach(s => s.option("disabled", !!state.filter));
 }
 
-function renderAll() { renderTiles(); renderPriorities(); renderBoard(); if (!$("#review").hidden) renderReview(); }
+function renderAll() {
+  renderTiles(); renderPriorities(); renderBoard(); renderReminderChrome();
+  if (state.view === "reminders") renderRemView();
+  if (!$("#review").hidden) renderReview();
+}
 
 /* ================================================================
    9. BOARD INTERACTIONS
@@ -795,9 +869,8 @@ function renderPanel() {
       </label>
       <div class="grid2">
         <label class="f">Category
-          <select data-field="category"><option value="">—</option>
-            ${cats.map(c => `<option ${t.category === c ? "selected" : ""}>${esc(c)}</option>`).join("")}
-          </select></label>
+          <select data-field="category">${categoryOptions(t.category)}</select>
+          <button type="button" class="linkbtn" data-act="cats" style="align-self:flex-start">Edit categories</button></label>
         <label class="f">Responsible person
           <input data-field="responsible" value="${esc(t.responsible)}" placeholder="e.g. Suzanne"></label>
         <label class="f">Target completion date
@@ -912,6 +985,8 @@ function wirePanel() {
       pushUndo(`status of “${t.title}”`, t);
       changeStatus(t, el.value); persist(t); renderAll(); renderPanel();
       if (el.value === "waiting" && prev !== "waiting") openWaitingPrompt(t);
+    } else if (el.dataset.field === "category" && el.value === "__new") {
+      newCategoryDialog(name => { t.category = name; persist(t); renderAll(); renderPanel(); }, () => renderPanel());
     } else if (el.dataset.field === "category" || el.dataset.field === "dueDate") {
       t[el.dataset.field] = el.value; persist(t); renderAll();
     } else if (el.dataset.field === "decisionNeeded") {
@@ -953,6 +1028,7 @@ function wirePanel() {
     else if (b.dataset.act === "dismiss") dismissReminder(t);
     else if (b.dataset.act === "email") emailTemplate(t);
     else if (b.dataset.act === "delete") confirmDelete(t);
+    else if (b.dataset.act === "cats") manageCategories();
   });
   P.addEventListener("submit", e => {
     e.preventDefault();
@@ -1264,7 +1340,8 @@ function reviewItemHTML(t, key) {
 
 function renderReview() {
   const secs = reviewSections();
-  const total = secs.reduce((n, s) => n + s.items.length, 0);
+  const rems = dueReminders();
+  const total = secs.reduce((n, s) => n + s.items.length, 0) + rems.length;
   const R = $("#review");
   const st = R.scrollTop;
   R.innerHTML = `<div class="review-inner">
@@ -1273,6 +1350,11 @@ function renderReview() {
       <button class="btn" data-ract="close">← Back to board</button>
     </div>
     <p class="muted" style="margin:0">${fmtLong(today())} · ${total ? `${total} item${total === 1 ? "" : "s"} to look at` : "Nothing needs reviewing. Everything is on track."} · Built automatically from your tasks.</p>
+    <section>
+      <h2>Reminders due <span class="n">${rems.length}</span></h2>
+      <p>Recurring obligations whose reminder window is open.</p>
+      ${rems.length ? rems.map(r => remRowHTML(r, true)).join("") : `<div class="rempty">Nothing here.</div>`}
+    </section>
     ${secs.map(s => `<section>
       <h2>${s.title} <span class="n">${s.items.length}</span></h2>
       <p>${s.hint}</p>
@@ -1301,6 +1383,297 @@ function wireReview() {
       progress: () => setStatus(t, "progress"),
       done: () => setStatus(t, "done"),
     })[act]?.();
+  });
+}
+
+/* ================================================================
+   11c. CATEGORIES — shared by tasks and reminders, editable.
+   ================================================================ */
+function categoryOptions(current) {
+  const cats = state.settings.categories || [];
+  const extra = current && !cats.includes(current) ? [current] : [];
+  return `<option value="">—</option>`
+    + [...cats, ...extra].map(c => `<option ${current === c ? "selected" : ""}>${esc(c)}</option>`).join("")
+    + `<option value="__new">+ Add new category…</option>`;
+}
+function addCategory(name) {
+  name = name.trim();
+  if (!name) return null;
+  const cats = state.settings.categories ||= [];
+  const hit = cats.find(c => c.toLowerCase() === name.toLowerCase());
+  if (hit) return hit;
+  cats.push(name); saveSettings();
+  return name;
+}
+function newCategoryDialog(onDone, onCancel) {
+  modal(`<h2>New category</h2>
+    <label class="f">Category name<input name="name" placeholder="Vehicles and Equipment"></label>`,
+    [{ label: "Cancel", cls: "ghost", onClick: () => { onCancel?.(); } },
+     { label: "Add", cls: "primary", primary: true, onClick: v => {
+        const n = addCategory(v.name || ""); if (!n) return false;
+        onDone(n); toast(`Category “${n}” added`);
+     } }]);
+}
+function manageCategories() {
+  const cats = state.settings.categories || [];
+  const used = c => [...state.tasks.values(), ...state.reminders.values()].filter(x => x.category === c).length;
+  modal(`<h2>Categories</h2>
+    <p class="muted" style="font-size:14px">Shared by tasks and reminders. Renaming updates every item that uses it. Removing only takes it off the list; existing items keep their label.</p>
+    ${cats.map((c, i) => `<div class="catrow"><input type="text" name="cat_${i}" value="${esc(c)}" aria-label="Category name">
+      <span class="muted" style="font-size:12.5px;min-width:48px">${used(c)} used</span>
+      <label><input type="checkbox" name="del_${i}"> Remove</label></div>`).join("")}
+    <label class="f">Add a category<input name="add" placeholder="Vehicles and Equipment"></label>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Save", cls: "primary", primary: true, onClick: v => {
+        const next = [], renamed = [];
+        cats.forEach((old, i) => {
+          if (v[`del_${i}`]) return;
+          const nv = (v[`cat_${i}`] || "").trim() || old;
+          if (nv !== old) renamed.push([old, nv]);
+          if (!next.includes(nv)) next.push(nv);
+        });
+        if (v.add?.trim() && !next.includes(v.add.trim())) next.push(v.add.trim());
+        state.settings.categories = next; saveSettings();
+        if (renamed.length) {
+          const map = Object.fromEntries(renamed);
+          const ts = [...state.tasks.values()].filter(t => map[t.category]);
+          ts.forEach(t => { t.category = map[t.category]; }); if (ts.length) persist(ts);
+          const rs = [...state.reminders.values()].filter(r => map[r.category]);
+          rs.forEach(r => { r.category = map[r.category]; }); if (rs.length) persistReminders(rs);
+        }
+        renderAll(); if (state.openId) renderPanel();
+        toast("Categories saved");
+     } }]);
+}
+
+/* ================================================================
+   11d. REMINDERS — recurring obligations (vehicle inspection, renewals…).
+   Invisible until their window opens (due date minus lead days).
+   ================================================================ */
+const UNITS = { none: "Does not repeat", week: "week", month: "month", year: "year" };
+function newReminder(f = {}) {
+  const now = new Date().toISOString();
+  return { id: uid(), title: "", companies: [], category: "", dueDate: addDays(30), every: 1, unit: "year",
+    leadDays: 30, responsible: "", link: "", notes: "", snoozedUntil: "", lastDoneOn: "", completedAt: null,
+    history: [{ at: now, type: "created", text: "Reminder created" }], createdAt: now, updatedAt: now, ...f };
+}
+function shiftDate(s, n, unit) {
+  const d = parseYmd(s);
+  if (unit === "week") d.setDate(d.getDate() + 7 * n);
+  else if (unit === "month" || unit === "year") {
+    const months = unit === "year" ? 12 * n : n, day = d.getDate();
+    d.setDate(1); d.setMonth(d.getMonth() + months);
+    d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  }
+  return ymd(d);
+}
+const repeats = r => r.unit && r.unit !== "none";
+const repeatLabel = r => !repeats(r) ? "One-off" : `Every ${+r.every > 1 ? r.every + " " + r.unit + "s" : r.unit}`.replace("Every year", "Yearly").replace("Every month", "Monthly").replace("Every week", "Weekly");
+const windowStart = r => { const d = parseYmd(r.dueDate); d.setDate(d.getDate() - (+r.leadDays || 0)); return ymd(d); };
+const isSnoozed = r => !!r.snoozedUntil && r.snoozedUntil > today();
+const isRemDue = r => !r.completedAt && !!r.dueDate && windowStart(r) <= today() && !isSnoozed(r);
+const isRemOverdue = r => isRemDue(r) && r.dueDate < today();
+const dueReminders = () => [...state.reminders.values()].filter(isRemDue).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+function pushRemUndo(label, rems, extra = {}) {
+  undoStack.push({ label, before: [], remBefore: [].concat(rems).map(clone), ...extra });
+  if (undoStack.length > 30) undoStack.shift();
+  $("#undoBtn").disabled = false;
+}
+
+function setView(v) {
+  state.view = v;
+  document.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("on", b.dataset.view === v));
+  document.querySelectorAll("[data-boardonly]").forEach(el => el.hidden = v !== "board");
+  $("#remView").hidden = v !== "reminders";
+  if (v === "reminders") { state.filter = null; $("#filterbar").hidden = true; }
+  renderAll();
+}
+
+function renderReminderChrome() {
+  const due = dueReminders();
+  const badge = $("#remBadge");
+  badge.hidden = !due.length; badge.textContent = due.length;
+  const strip = $("#remStrip");
+  // The strip only exists when something actually needs action.
+  strip.hidden = state.view !== "board" || !due.length;
+  strip.innerHTML = due.length ? `<span class="lead">🔔 Reminders</span>` + due.map(r =>
+    `<button class="pill ${isRemOverdue(r) ? "late" : ""}" data-rem="${r.id}">${esc(r.title)} · ${isRemOverdue(r) ? daysLabel(r.dueDate) : "due " + fmt(r.dueDate)}</button>`).join("") : "";
+}
+
+function remRowHTML(r, actionable) {
+  const comps = (r.companies || []).map(company).filter(Boolean);
+  const meta = [comps.map(c => esc(c.short || c.name)).join(", ") || "", r.category ? esc(r.category) : "",
+    `due ${fmtLong(r.dueDate)}`, repeatLabel(r), `shows ${+r.leadDays || 0} days before`, r.responsible ? "👤 " + esc(r.responsible) : ""].filter(Boolean).join(" · ");
+  const A = (act, label, cls = "") => `<button class="btn small ${cls}" data-remact="${act}" data-id="${r.id}">${label}</button>`;
+  let right;
+  if (r.completedAt) right = `<span class="when">Done ${fmt(r.completedAt.slice(0, 10))}</span>`;
+  else if (actionable) right = `<div class="ra">${A("done", "✓ Done", "primary")}${A("task", "Make task")}${A("snooze", "Snooze")}</div>`;
+  else if (isSnoozed(r)) right = `<div class="ra"><span class="when">Snoozed until ${fmt(r.snoozedUntil)}</span>${A("unsnooze", "Show now", "ghost")}</div>`;
+  else { const d = daysFromToday(windowStart(r)); right = `<span class="when">appears ${fmtY(windowStart(r))}${d > 0 ? ` · in ${d < 60 ? d + " days" : Math.round(d / 30) + " months"}` : ""}</span>`; }
+  const late = isRemOverdue(r) ? ` <span class="chip pri-Urgent">${daysLabel(r.dueDate)}</span>` : "";
+  return `<div class="rrow ${actionable ? "" : "sleep"}" style="--c:${comps[0]?.color || "#c9c4ba"}">
+    <div><div class="rt" data-remact="edit" data-id="${r.id}">${esc(r.title)}${late}</div><div class="rm">${meta}</div>
+    ${r.link ? `<div class="rm"><a href="${esc(r.link)}" target="_blank" rel="noopener">Open linked document ↗</a></div>` : ""}</div>
+    ${right}</div>`;
+}
+
+function renderRemView() {
+  const all = [...state.reminders.values()];
+  const due = dueReminders();
+  const sleeping = all.filter(r => !r.completedAt && !isRemDue(r)).sort((a, b) => windowStart(a).localeCompare(windowStart(b)));
+  const done = all.filter(r => r.completedAt).sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+  $("#remView").innerHTML = `
+    <div class="rv-head"><h2>Reminders</h2><button class="btn primary" data-remact="new">+ Add reminder</button></div>
+    <p class="muted" style="margin:0">Recurring obligations stay out of sight until it's time to act, then appear above the board.</p>
+    ${!all.length ? `<div class="rempty" style="margin-top:18px">No reminders yet. Add things like vehicle inspection, insurance renewals or annual filings. Each one shows up only when its reminder window opens.</div>` : ""}
+    ${all.length ? `<h3>Action needed now · ${due.length}</h3>${due.length ? due.map(r => remRowHTML(r, true)).join("") : `<div class="rempty">Nothing due. All quiet.</div>`}` : ""}
+    ${sleeping.length ? `<h3>Sleeping until their window opens · ${sleeping.length}</h3>${sleeping.map(r => remRowHTML(r, false)).join("")}` : ""}
+    ${done.length ? `<details style="margin-top:18px"><summary class="muted" style="cursor:pointer">Finished one-off reminders (${done.length})</summary><div style="margin-top:8px">${done.map(r => remRowHTML(r, false)).join("")}</div></details>` : ""}`;
+}
+
+function reminderForm(r) {
+  const isNew = !r;
+  r = r || newReminder();
+  const cos = state.settings.companies;
+  const unitOpts = Object.entries(UNITS).map(([k, v]) => `<option value="${k}" ${r.unit === k ? "selected" : ""}>${k === "none" ? v : v + "(s)"}</option>`).join("");
+  modal(`<h2>${isNew ? "New reminder" : "Edit reminder"}</h2>
+    <label class="f">What needs doing?<input name="title" value="${esc(r.title)}" placeholder="Vehicle inspection (TÜV), company car"></label>
+    <div class="f" style="font-size:13.5px;color:var(--muted)">Company / entity
+      <div class="chipboxes" style="margin-top:4px">${cos.map(c => `<label><input type="checkbox" name="co_${c.id}" ${(r.companies || []).includes(c.id) ? "checked" : ""}>${esc(c.short || c.name)}</label>`).join("")}</div></div>
+    <div class="grid2">
+      <label class="f">Category<select name="category">${categoryOptions(r.category).replace('<option value="__new">+ Add new category…</option>', "")}</select></label>
+      <label class="f">…or a new category<input name="newCategory" placeholder="Vehicles and Equipment"></label>
+      <label class="f">Next due date<input type="date" name="dueDate" value="${esc(r.dueDate)}" required></label>
+      <label class="f">Show reminder this many days before<input type="number" min="0" max="365" name="leadDays" value="${+r.leadDays || 0}"></label>
+    </div>
+    <div class="inline">
+      <label class="f">Repeats every<input type="number" min="1" max="60" name="every" value="${+r.every || 1}"></label>
+      <label class="f">&nbsp;<select name="unit">${unitOpts}</select></label>
+    </div>
+    <div class="grid2">
+      <label class="f">Responsible person<input name="responsible" value="${esc(r.responsible)}"></label>
+      <label class="f">Link to document (optional)<input type="url" name="link" value="${esc(r.link)}" placeholder="https://drive.google.com/…"></label>
+    </div>
+    <label class="f">Notes (optional)<textarea name="notes" rows="2" style="min-height:0">${esc(r.notes)}</textarea></label>
+    ${!isNew && r.history?.length ? `<details class="history"><summary>History (${r.history.length})</summary><ul>${[...r.history].reverse().map(h => `<li><time>${fmtStamp(h.at)}</time><span>${esc(h.text)}</span></li>`).join("")}</ul></details>` : ""}`,
+    [...(isNew ? [] : [{ label: "Delete", cls: "danger", onClick: () => { setTimeout(() => confirmDeleteReminder(r), 0); } }]),
+     { label: "Cancel", cls: "ghost" },
+     { label: isNew ? "Add reminder" : "Save", cls: "primary", primary: true, onClick: (v, form) => {
+        const err = msg => { let e = form.querySelector(".ferr"); if (!e) { e = document.createElement("p"); e.className = "ferr"; e.style.cssText = "color:var(--danger);font-size:14px"; form.querySelector(".actions").before(e); } e.textContent = msg; return false; };
+        if (!v.title.trim()) return err("Give the reminder a name.");
+        if (!v.dueDate) return err("Pick the next due date.");
+        if (!isNew) pushRemUndo(`edit reminder “${r.title}”`, r);
+        const cat = v.newCategory?.trim() ? addCategory(v.newCategory) : v.category;
+        Object.assign(r, {
+          title: v.title.trim(), companies: cos.filter(c => v["co_" + c.id]).map(c => c.id), category: cat || "",
+          dueDate: v.dueDate, leadDays: Math.max(0, +v.leadDays || 0), every: Math.max(1, +v.every || 1), unit: v.unit,
+          responsible: v.responsible.trim(), link: v.link.trim(), notes: v.notes,
+        });
+        if (isNew) { undoStack.push({ label: `add reminder “${r.title}”`, before: [], remCreatedIds: [r.id] }); $("#undoBtn").disabled = false; }
+        else r.history.push({ at: new Date().toISOString(), type: "info", text: "Reminder edited" });
+        persistReminders(r); renderAll();
+        toast(isRemDue(r) ? "Reminder saved. It's due now." : `Reminder saved. It will appear on ${fmtLong(windowStart(r))}.`);
+     } }]);
+}
+
+function confirmDeleteReminder(r) {
+  modal(`<h2>Delete this reminder?</h2><p>“${esc(r.title)}” and its history will be removed. You can undo right after.</p>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Delete", cls: "primary", primary: true, onClick: () => {
+        pushRemUndo(`delete reminder “${r.title}”`, r);
+        removeReminders([r.id]); renderAll(); toast("Reminder deleted", true);
+     } }]);
+}
+
+// Done (and Make task) always asks for the next date: suggested from the due date, editable.
+function doneDialog(r, makeTask = false) {
+  const fromDue = repeats(r) ? shiftDate(r.dueDate, +r.every || 1, r.unit) : "";
+  const fromToday = repeats(r) ? shiftDate(today(), +r.every || 1, r.unit) : "";
+  const form = modal(`<h2>${makeTask ? "Turn into a task" : "Mark reminder done"}</h2>
+    <p><b>${esc(r.title)}</b> · due ${fmtLong(r.dueDate)}</p>
+    ${makeTask ? `<p class="muted" style="font-size:14px">A task card is added to To Do with the same company, category and due date, so you can track the steps on the board.</p>` : ""}
+    ${repeats(r) ? `
+      <p style="font-size:14px">${repeatLabel(r)}. When should the next reminder be due?</p>
+      <div class="seg" id="nextQuick">
+        <button type="button" data-d="${fromDue}" class="on">${fmt(fromDue)} ${fromDue.slice(0, 4)} <span class="muted">(from due date)</span></button>
+        <button type="button" data-d="${fromToday}">${fmt(fromToday)} ${fromToday.slice(0, 4)} <span class="muted">(from today)</span></button>
+      </div>
+      <label class="f">Next due date<input type="date" name="next" value="${fromDue}"></label>
+      <label class="toggle" style="font-size:14px"><input type="checkbox" name="stop"> No further reminders (stop repeating)</label>`
+    : `<p class="muted" style="font-size:14px">This is a one-off reminder. It moves to "Finished" afterwards.</p>`}
+    ${makeTask ? "" : `<label class="f">Note (optional)<input name="note" placeholder="Passed; next inspection sticker for Nov 2028"></label>`}`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: makeTask ? "Create task" : "Mark done", cls: "primary", primary: true, onClick: v => {
+        if (repeats(r) && !v.stop && !v.next) return false;
+        pushRemUndo(makeTask ? `make task from “${r.title}”` : `done “${r.title}”`, r);
+        const now = new Date().toISOString();
+        if (makeTask) {
+          const t = newTask({ title: r.title, companies: [...(r.companies || [])], category: r.category || "", dueDate: r.dueDate,
+            responsible: r.responsible || "", status: "todo",
+            order: Math.min(1000, ...[...state.tasks.values()].filter(x => x.status === "todo").map(x => x.order ?? 0)) - 1000 });
+          t.notes.push({ id: uid(), at: now, kind: "note", text: `Created from reminder “${r.title}” (due ${fmt(r.dueDate)})${r.link ? ". Document: " + r.link : ""}${r.notes ? ". " + r.notes : ""}` });
+          undoStack[undoStack.length - 1].createdIds = [t.id];
+          persist(t);
+        }
+        r.history.push({ at: now, type: "done", text: `${makeTask ? "Turned into a task" : "Done"} (was due ${fmt(r.dueDate)})${v.note ? ": " + v.note : ""}` });
+        r.lastDoneOn = today(); r.snoozedUntil = "";
+        if (repeats(r) && !v.stop) { r.dueDate = v.next; r.history.push({ at: now, type: "info", text: `Next due ${fmt(v.next)} ${v.next.slice(0, 4)}` }); }
+        else r.completedAt = now;
+        persistReminders(r); renderAll();
+        toast(makeTask ? "Task added to To Do" : (r.completedAt ? "Reminder finished" : `Next reminder: due ${fmtLong(r.dueDate)}`), true);
+     } }]);
+  form.querySelectorAll("[data-d]").forEach(b => b.addEventListener("click", () => {
+    form.querySelector('[name="next"]').value = b.dataset.d;
+    form.querySelectorAll("[data-d]").forEach(x => x.classList.toggle("on", x === b));
+  }));
+}
+
+function snoozeReminder(r) {
+  const form = modal(`<h2>Snooze reminder</h2><p class="muted">“${esc(r.title)}” will hide until the date you pick.</p>
+    <div class="seg"><button type="button" data-days="3">3 days</button><button type="button" data-days="7" class="on">1 week</button><button type="button" data-days="14">2 weeks</button></div>
+    <label class="f">Hide until<input type="date" name="until" value="${addDays(7)}"></label>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Snooze", cls: "primary", primary: true, onClick: v => {
+        if (!v.until || v.until <= today()) return false;
+        pushRemUndo(`snooze “${r.title}”`, r);
+        r.snoozedUntil = v.until; r.history.push({ at: new Date().toISOString(), type: "info", text: `Snoozed until ${fmt(v.until)}` });
+        persistReminders(r); renderAll(); toast(`Snoozed until ${fmtLong(v.until)}`, true);
+     } }]);
+  form.querySelectorAll("[data-days]").forEach(b => b.addEventListener("click", () => {
+    form.querySelector('[name="until"]').value = addDays(+b.dataset.days);
+    form.querySelectorAll("[data-days]").forEach(x => x.classList.toggle("on", x === b));
+  }));
+}
+
+function remQuickActions(r) {
+  modal(`<h2>${esc(r.title)}</h2>
+    <p class="muted">${isRemOverdue(r) ? `<b style="color:var(--danger)">Overdue: ${daysLabel(r.dueDate)}</b>` : `Due ${fmtLong(r.dueDate)}`} · ${repeatLabel(r)}${r.responsible ? " · " + esc(r.responsible) : ""}</p>
+    ${r.notes ? `<p style="font-size:14.5px">${esc(r.notes)}</p>` : ""}
+    ${r.link ? `<p><a href="${esc(r.link)}" target="_blank" rel="noopener">Open linked document ↗</a></p>` : ""}`,
+    [{ label: "Edit", cls: "ghost", onClick: () => { setTimeout(() => reminderForm(r), 0); } },
+     { label: "Snooze", onClick: () => { setTimeout(() => snoozeReminder(r), 0); } },
+     { label: "Make task", onClick: () => { setTimeout(() => doneDialog(r, true), 0); } },
+     { label: "✓ Done", cls: "primary", primary: true, onClick: () => { setTimeout(() => doneDialog(r), 0); } }]);
+}
+
+function wireReminders() {
+  $("#newReminder").onclick = () => reminderForm();
+  document.addEventListener("click", e => {
+    const v = e.target.closest("[data-view]");
+    if (v) { setView(v.dataset.view); return; }
+    const pill = e.target.closest("[data-rem]");
+    if (pill) { const r = state.reminders.get(pill.dataset.rem); if (r) remQuickActions(r); return; }
+    const a = e.target.closest("[data-remact]");
+    if (!a) return;
+    if (a.dataset.remact === "new") return reminderForm();
+    const r = state.reminders.get(a.dataset.id); if (!r) return;
+    ({
+      edit: () => reminderForm(r),
+      done: () => doneDialog(r),
+      task: () => doneDialog(r, true),
+      snooze: () => snoozeReminder(r),
+      unsnooze: () => { pushRemUndo(`unsnooze “${r.title}”`, r); r.snoozedUntil = ""; persistReminders(r); renderAll(); },
+    })[a.dataset.remact]?.();
   });
 }
 
@@ -1372,7 +1745,7 @@ function start() {
   if (started) return; started = true;
   $("#login").hidden = true;
   $("#app").hidden = false;
-  buildBoard(); wireGlobal(); wirePanel(); wireReview();
+  buildBoard(); wireGlobal(); wirePanel(); wireReview(); wireReminders();
   store.subscribe(
     tasks => {
       state.tasks = new Map(tasks.map(t => [t.id, t]));
@@ -1381,7 +1754,8 @@ function start() {
       if (state.openId && !$("#panel").contains(document.activeElement)) renderPanel();
     },
     settings => { state.settings = { ...DEFAULT_SETTINGS, ...settings }; renderAll(); },
-    err => { console.error(err); toast("Connection problem: " + err.message); }
+    err => { console.error(err); toast("Connection problem: " + err.message); },
+    rems => { state.reminders = new Map(rems.map(r => [r.id, r])); renderAll(); }
   );
   setSaveState();
 }
