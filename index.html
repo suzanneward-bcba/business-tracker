@@ -297,6 +297,16 @@ label.f input,label.f select,label.f textarea{font-size:15.5px;color:var(--ink);
 .clink b{font-weight:600}
 .clink .x{border:0;background:transparent;color:#a8a296;font-size:18px;cursor:pointer;margin-left:auto}
 
+.imp-list{max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+.imp-row{display:grid;grid-template-columns:28px minmax(0,1.2fr) minmax(0,1.3fr) minmax(0,1fr);gap:8px;align-items:center;padding:7px 10px;border-top:1px solid #f0ede7;font-size:14px}
+.imp-row:first-child{border-top:0}
+.imp-row.dup{opacity:.5}
+.imp-row .sub{font-size:12.5px;color:var(--muted)}
+.imp-row input{width:18px;height:18px;accent-color:var(--accent)}
+.imp-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.imp-tools input[type=search],.imp-tools select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:14.5px}
+.imp-tools input[type=search]{flex:1;min-width:180px}
+
 /* Login */
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .login .box{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:var(--shadow);text-align:center}
@@ -373,7 +383,9 @@ const firebaseConfig = {
   appId: "1:1078613989963:web:dee916b214b4703364cbce"
 };
 const WORKSPACE_ID = "main";      // one shared workspace; multi-user ready
-const FIREBASE_VERSION = "10.12.2";
+const FIREBASE_VERSION = "12.12.1";          // needed for Firebase AI Logic (Gemini)
+const FIREBASE_FALLBACK_VERSION = "10.12.2"; // used only if the newer SDK fails to load (AI then unavailable)
+const AI_MODEL = "gemini-2.5-flash";
 
 /* ================================================================
    2. CONSTANTS & DEFAULT SETTINGS
@@ -547,11 +559,20 @@ function localStore() {
   };
 }
 
+let fbVersion = FIREBASE_VERSION;
+async function loadFirebaseCore() {
+  for (const v of [FIREBASE_VERSION, FIREBASE_FALLBACK_VERSION]) {
+    try {
+      const base = `https://www.gstatic.com/firebasejs/${v}`;
+      const mods = await Promise.all([import(`${base}/firebase-app.js`), import(`${base}/firebase-auth.js`), import(`${base}/firebase-firestore.js`)]);
+      fbVersion = v;
+      return mods;
+    } catch (e) { console.warn("Firebase " + v + " failed to load", e); }
+  }
+  throw new Error("Firebase could not be loaded. Check your internet connection.");
+}
 async function firebaseStore() {
-  const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
-  const { initializeApp } = await import(`${base}/firebase-app.js`);
-  const A = await import(`${base}/firebase-auth.js`);
-  const F = await import(`${base}/firebase-firestore.js`);
+  const [{ initializeApp }, A, F] = await loadFirebaseCore();
   const app = initializeApp(firebaseConfig);
   const auth = A.getAuth(app);
   let db;
@@ -990,11 +1011,13 @@ function renderPanel() {
         ${c.email ? `<a class="gmail" href="${gmailUrl({ to: c.email, su: t.title })}" target="_blank" rel="noopener">✉ Gmail</a>` : ""}
         ${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g, ""))}">${esc(c.phone)}</a>` : ""}
         <button class="x" data-unlink="${c.id}" title="Unlink contact" aria-label="Unlink ${esc(c.name)}">×</button></div>`).join("")}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn small" data-act="compose">✨ Write email</button>
       <select data-field="linkContact" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:14.5px">
         <option value="">+ Link a contact…</option>
         ${[...state.contacts.values()].filter(c => !(t.contactIds || []).includes(c.id)).sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}">${esc(c.name)}${c.org ? " · " + esc(c.org) : ""}</option>`).join("")}
         <option value="__new">+ New contact…</option>
-      </select>
+      </select></div>
     </div>
 
     ${showWait ? `
@@ -1146,6 +1169,7 @@ function wirePanel() {
     else if (b.dataset.act === "snooze") snoozeFollowUp(t);
     else if (b.dataset.act === "dismiss") dismissReminder(t);
     else if (b.dataset.act === "email") emailTemplate(t);
+    else if (b.dataset.act === "compose") composeEmail({ task: t });
     else if (b.dataset.act === "delete") confirmDelete(t);
     else if (b.dataset.act === "cats") manageCategories();
   });
@@ -1324,7 +1348,7 @@ function emailText(t, lang) {
   const what = w.what || t.title;
   if (lang === "de") return `Betreff: Nachfrage – ${what}
 
-Guten Tag${w.who ? " " + w.who : ""},
+${/^Frau\s/i.test(w.who || "") ? "Sehr geehrte " + w.who : /^Herr\s/i.test(w.who || "") ? "Sehr geehrter " + w.who : "Sehr geehrte Damen und Herren"},
 
 ich komme auf meine Nachricht${w.contactedOn ? " vom " + fmtDE(w.contactedOn) : ""} bezüglich ${what}${comp ? " (" + comp + ")" : ""} zurück.
 
@@ -1348,25 +1372,121 @@ Kind regards,
 ${sig}`;
 }
 
+// Follow-up email: opens the composer pre-filled with the German template.
 function emailTemplate(t) {
-  const form = modal(`<h2>Follow-up email</h2>
-    <div class="seg" style="max-width:220px"><button type="button" data-lang="en" class="on">English</button><button type="button" data-lang="de">Deutsch</button></div>
-    <label class="f">Edit before copying<textarea name="body">${esc(emailText(t, "en"))}</textarea></label>`,
-    [{ label: "Close", cls: "ghost" },
-     { label: "✉ Open in Gmail", onClick: v => {
-        const [first, ...rest] = v.body.split("\n");
-        const subj = first.replace(/^(Subject|Betreff):\s*/i, "");
-        const to = taskEmails(t);
-        open(gmailUrl({ to, su: subj, body: rest.join("\n").trim() }), "_blank", "noopener");
-        if (!to) toast("No email on the linked contacts. Add the address in Gmail.");
-        return false;
-     } },
-     { label: "Copy", cls: "primary", primary: true, onClick: v => { copyText(v.body); return false; } }]);
-  form.querySelectorAll("[data-lang]").forEach(b => b.addEventListener("click", () => {
-    form.querySelectorAll("[data-lang]").forEach(x => x.classList.toggle("on", x === b));
-    form.querySelector("textarea").value = emailText(t, b.dataset.lang);
-  }));
+  const w = t.waiting || {};
+  const [first, ...rest] = emailText(t, "de").split("\n");
+  composeEmail({ task: t, followUp: true,
+    purpose: `Follow up politely on: ${w.what || t.title}${w.contactedOn ? ` (last contacted ${fmtLong(w.contactedOn)})` : ""}. Ask for the current status and whether anything else is needed from us.`,
+    subject: first.replace(/^(Subject|Betreff):\s*/i, ""), body: rest.join("\n").trim() });
 }
+/* ================================================================
+   EMAIL COMPOSER with AI drafting (Gemini via Firebase AI Logic).
+   Only task/contact context is sent — never IBANs, tax numbers or
+   other profile numbers.
+   ================================================================ */
+const AI_SYSTEM = `You draft short, correct business emails for the sender, who owns several companies in Germany.
+Rules:
+- Write in the requested language. German must be natural, error-free business German.
+- Tone "formal": use "Sie". Greeting "Sehr geehrte Frau X," / "Sehr geehrter Herr X," when the recipient's name and title are clear (e.g. "Frau Becker"); otherwise "Sehr geehrte Damen und Herren,". Close with "Mit freundlichen Grüßen" and the sender's name on the next line.
+- Tone "friendly": still "Sie". Greeting "Guten Tag Frau X," (or "Guten Tag,"), close with "Viele Grüße" and the sender's name.
+- In English use a polite, professional tone.
+- Keep it concise: usually under 150 words. One clear request.
+- Use ONLY facts given in the context. Never invent numbers, dates, account details, reference numbers or legal/tax statements. Where something is missing, write a placeholder in square brackets, e.g. [Aktenzeichen].
+- Do not give legal or tax advice.
+- Reply with JSON only: {"subject": "...", "body": "..."}. The body uses \n for line breaks and includes greeting and closing.`;
+
+let aiModelPromise = null;
+function getAIModel() {
+  if (!firebaseConfig.apiKey) return Promise.reject(new Error("AI drafting needs the Firebase connection (it's off in local demo mode)."));
+  aiModelPromise ||= (async () => {
+    const base = `https://www.gstatic.com/firebasejs/${fbVersion}`;
+    const { initializeApp, getApps, getApp } = await import(`${base}/firebase-app.js`);
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const AI = await import(`${base}/firebase-ai.js`);
+    const ai = AI.getAI(app, { backend: new AI.GoogleAIBackend() });
+    return AI.getGenerativeModel(ai, { model: AI_MODEL, systemInstruction: AI_SYSTEM,
+      generationConfig: { responseMimeType: "application/json", temperature: 0.4 } });
+  })().catch(e => { aiModelPromise = null; throw e; });
+  return aiModelPromise;
+}
+
+function emailContext({ task, contacts, lang, tone, purpose }) {
+  const L = [];
+  L.push(`Sender: ${state.settings.signature || "Suzanne Ward"}`);
+  L.push(`Language: ${lang === "de" ? "German" : "English"}; tone: ${tone}`);
+  if (contacts.length) L.push(`Recipient(s): ${contacts.map(c => [c.name, c.role, c.org].filter(Boolean).join(", ")).join(" | ")}`);
+  if (task) {
+    const comps = (task.companies || []).map(id => { const c = company(id); return c ? (state.entities.get(id)?.legalName || c.name) : null; }).filter(Boolean);
+    L.push(`Matter: ${task.title}`);
+    if (comps.length) L.push(`Company / entity: ${comps.join(", ")}`);
+    if (task.dueDate) L.push(`Target date: ${fmtDE(task.dueDate)}`);
+    const w = task.waiting || {};
+    if (task.status === "waiting" || w.what) {
+      if (w.what) L.push(`We are waiting for: ${w.what}`);
+      if (w.who) L.push(`Waiting on: ${w.who}`);
+      if (w.contactedOn) L.push(`Last contact: ${fmtDE(w.contactedOn)}`);
+      if (w.expectedResponseOn) L.push(`Expected response by: ${fmtDE(w.expectedResponseOn)}`);
+    }
+    const next = openSteps(task)[0];
+    if (next) L.push(`Current step: ${next.text}`);
+    const notes = (task.notes || []).slice(-3);
+    if (notes.length) L.push(`Recent notes:\n${notes.map(n => `- ${fmtDE(n.at.slice(0, 10))}: ${n.text}`).join("\n")}`);
+  }
+  L.push(`What the email should say: ${purpose || "(not specified — write a short, polite status inquiry)"}`);
+  return L.join("\n");
+}
+
+function composeEmail({ task = null, contacts = null, followUp = false, purpose = "", subject = "", body = "" } = {}) {
+  const cts = contacts || (task ? (task.contactIds || []).map(id => state.contacts.get(id)).filter(Boolean) : []);
+  const to = cts.map(c => c.email).filter(Boolean).join(", ");
+  const form = modal(`<h2>${followUp ? "Follow-up email" : "Write email"}${task ? ` <span class="muted" style="font-size:14px;font-weight:400">· ${esc(task.title)}</span>` : ""}</h2>
+    <label class="f">To<input name="to" value="${esc(to)}" placeholder="name@example.de"></label>
+    <label class="f">What should the email say? (any language)<textarea name="purpose" rows="2" style="min-height:0" placeholder="Ask the bank whether the account application is complete and when we can expect the IBAN.">${esc(purpose)}</textarea></label>
+    <div class="grid2">
+      <label class="f">Language<select name="lang"><option value="de" selected>Deutsch</option><option value="en">English</option></select></label>
+      <label class="f">Tone<select name="tone"><option value="formal" selected>Formal (Sie, Sehr geehrte …)</option><option value="friendly">Friendly-formal (Sie, Guten Tag …)</option></select></label>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button type="button" class="btn primary" id="aiDraft">✨ Draft with AI</button>
+      <span id="aiStatus" class="muted" style="font-size:13.5px">AI writes a draft; review it before sending.</span>
+    </div>
+    <label class="f">Subject<input name="subject" value="${esc(subject)}"></label>
+    <label class="f">Email<textarea name="body" style="min-height:220px">${esc(body)}</textarea></label>`,
+    [{ label: "Close", cls: "ghost" },
+     { label: "Copy", onClick: v => { copyText((v.subject ? (v.lang === "de" ? "Betreff: " : "Subject: ") + v.subject + "\n\n" : "") + v.body); return false; } },
+     { label: "✉ Open in Gmail", cls: "primary", primary: true, onClick: v => {
+        open(gmailUrl({ to: v.to.replace(/\s+/g, ""), su: v.subject, body: v.body }), "_blank", "noopener");
+        if (task && task.status === "waiting") toastAction("Sent it? Record it as a follow-up.", "Record", () => followUpCompleted(task));
+        else if (!v.to) toast("No recipient yet. Add the address in Gmail.");
+        return false;
+     } }]);
+  const btn = form.querySelector("#aiDraft"), status = form.querySelector("#aiStatus");
+  btn.addEventListener("click", async () => {
+    const v = Object.fromEntries(new FormData(form));
+    btn.disabled = true; btn.textContent = "Drafting…"; status.style.color = ""; status.textContent = "Asking Gemini…";
+    try {
+      const model = await getAIModel();
+      const res = await model.generateContent(emailContext({ task, contacts: cts, lang: v.lang, tone: v.tone, purpose: v.purpose.trim() }));
+      const raw = res.response.text().trim().replace(/^```(json)?|```$/g, "");
+      let out; try { out = JSON.parse(raw); } catch { out = { subject: v.subject, body: raw }; }
+      form.querySelector('[name="subject"]').value = out.subject || v.subject;
+      form.querySelector('[name="body"]').value = (out.body || "").replace(/\\n/g, "\n");
+      status.textContent = "Draft ready. Check names, dates and [placeholders] before sending.";
+    } catch (e) {
+      console.error(e);
+      const msg = String(e.message || e);
+      status.style.color = "var(--danger)";
+      status.textContent = /demo mode/.test(msg) ? msg
+        : /api-not-enabled|not been used|PERMISSION_DENIED|403|ai-logic|firebasevertexai/i.test(msg) ? "AI isn't switched on yet: in Firebase open AI Services → AI Logic → Get started, choose the Gemini Developer API."
+        : /firebase-ai\.js|Failed to fetch dynamically/i.test(msg) ? "The AI module couldn't load. Reload the page and try again."
+        : /quota|429|RESOURCE_EXHAUSTED/i.test(msg) ? "The free AI quota is used up for now. Try again in a minute."
+        : "AI draft failed: " + msg.slice(0, 160);
+    } finally { btn.disabled = false; btn.textContent = "✨ Draft with AI"; }
+  });
+  return form;
+}
+
 function copyText(s) {
   const done = () => toast("Copied to clipboard");
   if (navigator.clipboard?.writeText) navigator.clipboard.writeText(s).then(done, fallback); else fallback();
@@ -2264,7 +2384,7 @@ function contactCardHTML(c) {
     <div class="cn" data-ctact="edit" data-id="${c.id}">${esc(c.name)}</div>
     <div class="co">${esc([c.role, c.org].filter(Boolean).join(" · ")) || "&nbsp;"}</div>
     ${comps.length ? `<div class="line">${comps.map(x => `<span class="chip" style="--cs:${x.soft}">${esc(x.short || x.name)}</span>`).join("")}</div>` : ""}
-    ${c.email ? `<div class="line"><span>${esc(c.email)}</span><a class="gmail" href="${gmailUrl({ to: c.email })}" target="_blank" rel="noopener">✉ Gmail</a><button class="copy" data-copy="${esc(c.email)}">Copy</button></div>` : ""}
+    ${c.email ? `<div class="line"><span>${esc(c.email)}</span><a class="gmail" href="${gmailUrl({ to: c.email })}" target="_blank" rel="noopener">✉ Gmail</a><button class="copy" data-copy="${esc(c.email)}">Copy</button><button class="copy" data-ctact="write" data-id="${c.id}">✨ Write</button></div>` : ""}
     ${c.phone ? `<div class="line"><a href="tel:${esc(c.phone.replace(/\s+/g, ""))}">📞 ${esc(c.phone)}</a></div>` : ""}
     ${linked.length ? `<div class="line muted" style="font-size:13px">${open} open task${open === 1 ? "" : "s"} · ${linked.length} total</div>` : ""}
   </div>`;
@@ -2282,6 +2402,7 @@ function renderCtView() {
     .sort((a, b) => a.name.localeCompare(b.name));
   const roles = [...new Set([...CONTACT_ROLES, ...[...state.contacts.values()].map(c => c.role).filter(Boolean)])];
   V.innerHTML = `<div class="ev-head" style="display:flex;align-items:center;gap:10px;margin:4px 0"><h2 style="flex:1;margin:0;font-size:20px">Contacts</h2>
+      <button class="btn" data-ctact="import">⇪ Import contacts</button>
       <button class="btn primary" data-ctact="new">+ Add contact</button></div>
     <div class="ct-tools">
       <input id="ctSearch" type="search" placeholder="Search name, organization, email…" value="${esc(ctFilter.q)}" aria-label="Search contacts">
@@ -2289,7 +2410,7 @@ function renderCtView() {
       <select id="ctCompany" aria-label="Filter by company"><option value="">All companies</option>${entityCompanies().map(c => `<option value="${c.id}" ${ctFilter.company === c.id ? "selected" : ""}>${esc(c.short || c.name)}</option>`).join("")}</select>
     </div>
     ${state.contacts.size ? (list.length ? `<div class="ct-grid">${list.map(contactCardHTML).join("")}</div>` : `<div class="rempty">No contacts match.</div>`)
-      : `<div class="rempty">No contacts yet. Add your bank advisor, Steuerberater, notary or insurance agent. Each email address gets a Gmail button, and you can link contacts to tasks.</div>`}`;
+      : `<div class="rempty">No contacts yet. <b>Import</b> them from a Google Contacts export, or add your bank advisor, Steuerberater, notary or insurance agent by hand. Each email address gets a Gmail button, and you can link contacts to tasks.</div>`}`;
   if (focusSearch) { const i = $("#ctSearch"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
 }
 
@@ -2340,11 +2461,166 @@ function confirmDeleteContact(c) {
      } }]);
 }
 
+/* ---------- import from Google Contacts / Outlook export (CSV or vCard) ----------
+   The file is read in the browser; only the contacts you tick are saved. */
+function parseCSV(text) {
+  const rows = []; let row = [], f = "", q = false;
+  text = text.replace(/^﻿/, "");
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ",") { row.push(f); f = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += ch;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim()));
+}
+function contactsFromCSV(text) {
+  const [head, ...rows] = parseCSV(text);
+  if (!head) return [];
+  const H = head.map(h => h.trim().toLowerCase());
+  const col = (...res) => { for (const re of res) { const i = H.findIndex(h => re.test(h)); if (i >= 0) return i; } return -1; };
+  const all = re => H.map((h, i) => re.test(h) ? i : -1).filter(i => i >= 0);
+  const iName = col(/^name$/, /^display name$/), iFirst = col(/^(first|given) name$/), iMid = col(/^(middle|additional) name$/), iLast = col(/^(last|family) name$/);
+  const iOrg = col(/^organi[sz]ation( 1)? - name$/, /^organi[sz]ation name$/, /^company$/, /^organi[sz]ation$/);
+  const iTitle = col(/^organi[sz]ation( 1)? - title$/, /^organi[sz]ation title$/, /^job title$/);
+  const iNotes = col(/^notes$/), iLabels = col(/^labels$/, /^group membership$/, /^categories$/);
+  const iWeb = col(/^website 1 - value$/, /^web page$/), iAddr = col(/^address 1 - formatted$/, /^business address$/, /^home address$/);
+  const emails = all(/^e-?mail( address| \d+ - value| \d+ address)?$|^e-mail \d+ - value$/), phones = all(/^phone \d+ - value$|phone$/);
+  const get = (r, i) => i >= 0 ? (r[i] || "").trim() : "";
+  return rows.map(r => {
+    const name = get(r, iName) || [get(r, iFirst), get(r, iMid), get(r, iLast)].filter(Boolean).join(" ");
+    const email = emails.map(i => get(r, i)).flatMap(v => v.split(" ::: ")).map(v => v.trim()).find(Boolean) || "";
+    const phone = phones.map(i => get(r, i)).flatMap(v => v.split(" ::: ")).map(v => v.trim()).find(Boolean) || "";
+    const labels = get(r, iLabels).split(" ::: ").map(x => x.replace(/^\* ?/, "").trim()).filter(x => x && !/^myContacts$/i.test(x) && !/^starred$/i.test(x));
+    return { name: name || get(r, iOrg) || email, org: get(r, iOrg), title: get(r, iTitle), email, phone,
+      address: get(r, iAddr), website: get(r, iWeb), notes: get(r, iNotes), labels };
+  }).filter(c => c.name);
+}
+function contactsFromVCF(text) {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\n[ \t]/g, "").split("\n");
+  const out = []; let c = null;
+  const un = v => v.replace(/\\n/gi, "\n").replace(/\\([,;\\])/g, "$1").trim();
+  for (const line of lines) {
+    if (/^BEGIN:VCARD/i.test(line)) { c = { name: "", org: "", title: "", email: "", phone: "", address: "", website: "", notes: "", labels: [] }; continue; }
+    if (/^END:VCARD/i.test(line)) { if (c) { c.name ||= c.org || c.email; if (c.name) out.push(c); } c = null; continue; }
+    if (!c) continue;
+    const m = line.match(/^(?:item\d+\.)?([A-Z-]+)((?:;[^:]*)?):(.*)$/i); if (!m) continue;
+    const key = m[1].toUpperCase(), val = m[3];
+    if (key === "FN") c.name = un(val);
+    else if (key === "N" && !c.name) { const [last, first, mid] = val.split(";").map(un); c.name = [first, mid, last].filter(Boolean).join(" "); }
+    else if (key === "EMAIL" && !c.email) c.email = un(val);
+    else if (key === "TEL" && !c.phone) c.phone = un(val);
+    else if (key === "ORG" && !c.org) c.org = un(val.split(";")[0]);
+    else if (key === "TITLE") c.title = un(val);
+    else if (key === "ADR" && !c.address) c.address = val.split(";").map(un).filter(Boolean).join("\n");
+    else if (key === "URL" && !c.website) c.website = un(val);
+    else if (key === "NOTE") c.notes = un(val);
+    else if (key === "CATEGORIES") c.labels = val.split(",").map(un).filter(x => x && !/^myContacts$/i.test(x) && !/^starred$/i.test(x));
+  }
+  return out;
+}
+function guessRole(c) {
+  const t = [c.org, c.title, ...(c.labels || []), c.email].join(" ").toLowerCase();
+  if (/steuerberat|steuerkanzlei|stb\b|tax advis/.test(t)) return "Steuerberater";
+  if (/notar/.test(t)) return "Notary";
+  if (/finanzamt|stadtverwaltung|gemeinde|kreisverwaltung|amtsgericht|ihk\b|behörde|rathaus/.test(t)) return "Finanzamt / authority";
+  if (/rechtsanwalt|anwalt|kanzlei|lawyer|legal/.test(t)) return "Lawyer";
+  if (/versicherung|insurance|allianz|axa\b|huk|ergo\b|generali|signal iduna|debeka/.test(t)) return "Insurance";
+  if (/sparkasse|bank|volksbank|raiffeisen|commerzbank|n26|ing\b|postbank|hypo/.test(t)) return "Bank";
+  if (/finanzberat|vermögensberat|financial advis/.test(t)) return "Financial advisor";
+  if (/makler|hausverwalt|vermieter|landlord|immobil/.test(t)) return "Property / landlord";
+  return "";
+}
+
+function importContactsDialog() {
+  let parsed = [];
+  const existingEmails = new Set([...state.contacts.values()].map(c => (c.email || "").toLowerCase()).filter(Boolean));
+  const existingNames = new Set([...state.contacts.values()].map(c => c.name.toLowerCase()));
+  const isDup = c => (c.email && existingEmails.has(c.email.toLowerCase())) || existingNames.has(c.name.toLowerCase());
+  const form = modal(`<h2>Import contacts</h2>
+    <details><summary style="cursor:pointer;color:var(--accent)">How Tobias exports his Google Contacts (30 seconds)</summary>
+      <ol style="margin:8px 0 0;padding-left:20px;font-size:14px;line-height:1.6">
+        <li>Open <b>contacts.google.com</b> signed in as tobias@adaptability.co.</li>
+        <li>Optional: tick only the contacts you need, or pick a label on the left.</li>
+        <li>Click <b>Export</b> (the ⇩ icon at the top). Choose <b>Google CSV</b> or <b>vCard</b>, then click <b>Export</b>.</li>
+        <li>Send you the file, for example through Google Drive, and choose it below.</li>
+      </ol>
+      <p class="muted" style="font-size:13px;margin:6px 0 0">Outlook CSV and vCard files from iPhone/Mac also work. The file is read in your browser; only the contacts you tick are saved to the tracker.</p>
+    </details>
+    <label class="f">Contacts file (.csv or .vcf)<input type="file" name="file" accept=".csv,.vcf,.vcard,text/csv,text/vcard"></label>
+    <div id="impArea"></div>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Import selected", cls: "primary", primary: true, onClick: (v, f) => {
+        const picks = [...f.querySelectorAll("[data-pick]:checked")].map(x => parsed[+x.dataset.pick]);
+        if (!picks.length) { const st = f.querySelector("#impMsg"); if (st) st.textContent = "Tick at least one contact."; else toast("Choose a file first."); return false; }
+        const companies = state.settings.companies.filter(x => v["ico_" + x.id]).map(x => x.id);
+        const now = new Date().toISOString();
+        const added = picks.map(c => ({ id: uid(), name: c.name, org: c.org, role: v.role === "__auto" ? guessRole(c) : v.role, email: c.email, phone: c.phone,
+          website: c.website, address: c.address, notes: [c.title ? "Title: " + c.title : "", c.notes].filter(Boolean).join("\n"),
+          companies, labels: c.labels, importedFrom: v.source || "Google Contacts", createdAt: now, updatedAt: now }));
+        added.forEach(c => state.contacts.set(c.id, c));
+        pending++; setSaveState();
+        store.saveContacts(added.map(clone)).then(() => { pending--; setSaveState(); }).catch(err => { pending--; saveError = true; setSaveState(); toast("Could not save: " + err.message); });
+        renderAll();
+        toast(`${added.length} contact${added.length === 1 ? "" : "s"} imported`);
+     } }]);
+  const area = form.querySelector("#impArea");
+  const renderList = () => {
+    const q = (area.querySelector("#impQ")?.value || "").toLowerCase(), lab = area.querySelector("#impLabel")?.value || "";
+    area.querySelectorAll(".imp-row[data-i]").forEach(row => {
+      const c = parsed[+row.dataset.i];
+      const show = (!q || [c.name, c.org, c.email, c.title].join(" ").toLowerCase().includes(q)) && (!lab || (c.labels || []).includes(lab));
+      row.hidden = !show;
+    });
+    const n = area.querySelectorAll("[data-pick]:checked").length;
+    area.querySelector("#impCount").textContent = `${n} selected`;
+  };
+  form.querySelector('[name="file"]').addEventListener("change", async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const text = await file.text();
+    parsed = /BEGIN:VCARD/i.test(text) ? contactsFromVCF(text) : contactsFromCSV(text);
+    parsed.sort((a, b) => a.name.localeCompare(b.name));
+    if (!parsed.length) { area.innerHTML = `<p style="color:var(--danger)">No contacts found in this file. Use a Google CSV, Outlook CSV or vCard export.</p>`; return; }
+    const labels = [...new Set(parsed.flatMap(c => c.labels || []))].sort();
+    const dups = parsed.filter(isDup).length;
+    area.innerHTML = `<p style="margin:4px 0 8px;font-size:14px">${parsed.length} contacts found${dups ? ` · ${dups} already in the tracker (greyed out)` : ""}. Tick the ones to add.</p>
+      <div class="imp-tools">
+        <input type="search" id="impQ" placeholder="Search name, company, email…" aria-label="Search file">
+        ${labels.length ? `<select id="impLabel" aria-label="Google label"><option value="">All labels</option>${labels.map(l => `<option>${esc(l)}</option>`).join("")}</select>` : ""}
+        <button type="button" class="btn small" id="impAll">Select shown</button><button type="button" class="btn small ghost" id="impNone">Clear</button>
+        <span id="impCount" class="muted" style="font-size:13.5px">0 selected</span>
+      </div>
+      <div class="imp-list" style="margin-top:8px">${parsed.map((c, i) => `<label class="imp-row ${isDup(c) ? "dup" : ""}" data-i="${i}">
+        <input type="checkbox" data-pick="${i}" ${isDup(c) ? "disabled" : ""}>
+        <div><div>${esc(c.name)}</div>${c.title ? `<div class="sub">${esc(c.title)}</div>` : ""}</div>
+        <div><div>${esc(c.org || "")}</div><div class="sub">${esc(c.email || "")}</div></div>
+        <div class="sub">${isDup(c) ? "Already added" : esc((c.labels || []).join(", ")) || esc(guessRole(c))}</div></label>`).join("")}</div>
+      <p id="impMsg" style="color:var(--danger);font-size:13.5px;margin:6px 0 0"></p>
+      <div class="grid2" style="margin-top:6px">
+        <label class="f">Role for selected<select name="role"><option value="__auto">Guess from company/label (Bank, Notar, Steuer…)</option>${CONTACT_ROLES.map(r => `<option>${esc(r)}</option>`).join("")}<option value="">No role</option></select></label>
+        <label class="f">Source note<input name="source" value="Google Contacts (Tobias)"></label>
+      </div>
+      <div class="f" style="font-size:13.5px;color:var(--muted)">Tag selected contacts with company (optional)
+        <div class="chipboxes" style="margin-top:4px">${state.settings.companies.filter(x => x.id !== "general").map(x => `<label><input type="checkbox" name="ico_${x.id}">${esc(x.short || x.name)}</label>`).join("")}</div></div>`;
+    area.querySelector("#impQ").addEventListener("input", renderList);
+    area.querySelector("#impQ").addEventListener("keydown", ev => { if (ev.key === "Enter") ev.preventDefault(); });
+    area.querySelector("#impLabel")?.addEventListener("change", renderList);
+    area.addEventListener("change", ev => { if (ev.target.matches("[data-pick]")) renderList(); });
+    area.querySelector("#impAll").addEventListener("click", () => { area.querySelectorAll(".imp-row:not([hidden]) [data-pick]:not(:disabled)").forEach(x => x.checked = true); renderList(); });
+    area.querySelector("#impNone").addEventListener("click", () => { area.querySelectorAll("[data-pick]").forEach(x => x.checked = false); renderList(); });
+  });
+}
+
 function wireContacts() {
   document.addEventListener("click", e => {
     const a = e.target.closest("[data-ctact]"); if (!a) return;
     if (a.dataset.ctact === "new") contactForm(null, { companies: ctFilter.company ? [ctFilter.company] : [] });
+    else if (a.dataset.ctact === "import") importContactsDialog();
     else if (a.dataset.ctact === "edit") { const c = state.contacts.get(a.dataset.id); if (c) contactForm(c); }
+    else if (a.dataset.ctact === "write") { const c = state.contacts.get(a.dataset.id); if (c) composeEmail({ contacts: [c] }); }
   });
   document.addEventListener("input", e => { if (e.target.id === "ctSearch") { ctFilter.q = e.target.value; renderCtView(); } });
   document.addEventListener("change", e => {

@@ -42,6 +42,16 @@ Firebase → **Authentication → Settings → Authorized domains → Add domain
 `suzanneward-bcba.github.io` and/or `your-site.netlify.app`.
 Without this step, Google sign-in shows an "unauthorized domain" error.
 
+## Turn on AI email drafting (Gemini, about 5 minutes)
+The "✨ Draft with AI" button in the email composer uses **Firebase AI Logic** with the **Gemini Developer API**. That API works on the free Spark plan.
+1. Firebase console → **AI Services → AI Logic** → **Get started**.
+2. Choose **Gemini Developer API**, not "Vertex AI / Agent Platform", which needs billing. Follow the prompts, which enable the API for this project.
+3. If the setup asks about **App Check enforcement**, leave enforcement **off** for now. Enforcement requires a reCAPTCHA setup first, and with it switched on, every AI request fails.
+4. Done. Open the tracker, go to a task → **✨ Write email** (or a contact → **✨ Write**), and click **Draft with AI**.
+
+What is sent to Gemini: only the task title, company name, dates, current step, the last 3 notes, the recipient's name/role/organization and your instructions. IBANs, tax numbers and other profile numbers are never included. On Google's free tier, prompts may be used to improve Google's products, so don't type confidential details into the "What should the email say?" box.
+Always review the draft before sending. It is a starting point, not legal or tax wording.
+
 ## How data is stored
 - `workspaces/main` holds settings (companies, categories, email signature).
 - `workspaces/main/tasks/{id}` holds one document per task: details, checklist, waiting/follow-up info, and history. It also has empty `contacts`, `documents` and `notes` lists, ready for Phase 2.
@@ -53,4 +63,3 @@ Firestore → **Import/Export** can back up the database (requires the Blaze pla
 
 ## Disclaimer
 Checklists and example tasks are organizational aids, not legal or tax instructions. Verify requirements with the appropriate professional.
-

@@ -1,5 +1,8 @@
 rules_version = '2';
 
+// Only the Google accounts listed below can read or write anything.
+// To add a second user later, add their email (lowercase) to the list
+// and publish the rules again.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -16,6 +19,7 @@ service cloud.firestore {
       allow read, write: if isAllowed();
     }
 
+    // Everything else is closed.
     match /{document=**} {
       allow read, write: if false;
     }
