@@ -269,6 +269,18 @@ label.f input,label.f select,label.f textarea{font-size:15.5px;color:var(--ink);
 .linked li{cursor:pointer}
 .linked li:hover{text-decoration:underline}
 
+.hist-filters{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 4px}
+.hist-filters button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 12px;font-size:13.5px;cursor:pointer}
+.hist-filters button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.hist-month{font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:650;margin:18px 0 6px}
+.hist{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--line)}
+.hist li{position:relative;padding:6px 0 8px 12px}
+.hist li::before{content:"";position:absolute;left:-20px;top:12px;width:10px;height:10px;border-radius:50%;background:var(--dot,#c9c4ba);border:2px solid #fff}
+.hist .when{font-size:12.5px;color:var(--muted)}
+.hist .what{font-size:15px}
+.hist .src{font-size:13px;color:var(--accent);cursor:pointer}
+.hist .src:hover{text-decoration:underline}
+
 /* Login */
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .login .box{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:var(--shadow);text-align:center}
@@ -1794,7 +1806,7 @@ const ENT_GROUPS = {
   custom: { title: "Other details", keys: [["label", "Label"], ["value", "Value"]] },
 };
 const EXTRA_COLORS = [["#d0617a", "#f9e3e8"], ["#4f9bc2", "#e1eff7"], ["#7d9a3c", "#ecf2df"], ["#b0703e", "#f5e8dc"]];
-const flip = { id: null, editing: false, src: null };
+const flip = { id: null, editing: false, history: false, histFilter: "all", src: null };
 
 const entityCompanies = () => state.settings.companies.filter(c => c.id !== "general");
 function guessForm(name) { return /co\.?\s*kg/i.test(name) ? "GmbH & Co. KG" : /\bUG\b/.test(name) ? "UG (haftungsbeschränkt)" : /gmbh/i.test(name) ? "GmbH" : ""; }
@@ -1904,7 +1916,7 @@ function drawOrgLines(cos, parents) {
 function openFlip(id) {
   const src = document.querySelector(`[data-ent="${id}"]`);
   const c = company(id); if (!src || !c) return;
-  flip.id = id; flip.editing = false; flip.src = src;
+  flip.id = id; flip.editing = false; flip.history = false; flip.histFilter = "all"; flip.src = src;
   const r = src.getBoundingClientRect();
   const F = $("#flipCard");
   F.style.setProperty("--c", c.color);
@@ -1924,7 +1936,7 @@ function closeFlip() {
   const src = document.querySelector(`[data-ent="${flip.id}"]`);
   F.classList.remove("open");
   if (src) { const r = src.getBoundingClientRect(); Object.assign(F.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" }); }
-  const done = () => { F.hidden = true; $("#flipScrim").hidden = true; flip.id = null; flip.editing = false; renderEntView(); };
+  const done = () => { F.hidden = true; $("#flipScrim").hidden = true; flip.id = null; flip.editing = false; flip.history = false; renderEntView(); };
   matchMedia("(prefers-reduced-motion: reduce)").matches ? done() : setTimeout(done, 460);
 }
 
@@ -1940,10 +1952,12 @@ function renderBack() {
   const e = entityOf(c);
   const back = $("#flipCard .back");
   if (flip.editing) { back.innerHTML = entEditHTML(c, e); return; }
+  if (flip.history) { back.innerHTML = historyHTML(c); return; }
   const tasks = [...state.tasks.values()].filter(t => t.status !== "done" && (t.companies || []).includes(c.id));
   const rems = [...state.reminders.values()].filter(r => !r.completedAt && (r.companies || []).includes(c.id)).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   back.innerHTML = `
     <div class="pf-head"><h2>${esc(c.short || c.name)}</h2>
+      <button class="btn small" data-entact="history">🕘 History</button>
       <button class="btn small" data-entact="edit">✎ Edit</button>
       <button class="btn small ghost" data-entact="close" aria-label="Close">✕ Close</button></div>
     <div class="pf-body">
@@ -1964,6 +1978,68 @@ function renderBack() {
         <dt>Reminders (${rems.length})</dt><dd>${rems.length ? `<ul class="linked" style="margin:0;padding-left:18px">${rems.map(r => `<li data-rem="${r.id}">${esc(r.title)} <span class="muted">· due ${fmtY(r.dueDate)}</span></li>`).join("")}</ul>` : "—"}</dd></dl>
       </div>
       ${e.updatedAt ? `<p class="muted" style="font-size:12.5px;margin-top:20px">Last updated ${fmtStamp(e.updatedAt)}</p>` : ""}
+    </div>`;
+}
+
+/* ---------- company history: a timeline built from existing records ---------- */
+const HIST_TYPES = {
+  task:     { label: "Completed tasks", icon: "✅", dot: "#2f7d4f" },
+  step:     { label: "Checklist steps", icon: "☑", dot: "#8fbf9f" },
+  contact:  { label: "Follow-ups and responses", icon: "↔", dot: "#c4862f" },
+  note:     { label: "Notes", icon: "📝", dot: "#5b7bd5" },
+  reminder: { label: "Reminders", icon: "🔔", dot: "#b45309" },
+  profile:  { label: "Profile", icon: "✎", dot: "#9a958b" },
+};
+function companyHistory(cid) {
+  const out = [];
+  const NOTE_ICON = { call: "📞", meeting: "👥", email: "✉", note: "📝" };
+  for (const t of state.tasks.values()) {
+    if (!(t.companies || []).includes(cid)) continue;
+    const src = { kind: "task", id: t.id, title: t.title };
+    let sawDone = false;
+    for (const h of t.history || []) {
+      if (h.type === "status" && /→ Completed$/.test(h.text)) { sawDone = true; out.push({ at: h.at, type: "task", text: `Completed: ${t.title}`, src }); }
+      else if (h.type === "step" && h.text.startsWith("Completed step: ")) out.push({ at: h.at, type: "step", text: h.text.replace("Completed step: ", "Step done: "), src });
+      else if (h.type === "followup" && h.text.startsWith("Follow-up completed")) out.push({ at: h.at, type: "contact", text: h.text, src });
+      else if (h.type === "response") out.push({ at: h.at, type: "contact", text: h.text, src });
+    }
+    if (t.status === "done" && t.completedAt && !sawDone) out.push({ at: t.completedAt, type: "task", text: `Completed: ${t.title}`, src });
+    for (const n of t.notes || []) out.push({ at: n.at, type: "note", icon: NOTE_ICON[n.kind], text: n.text, src });
+  }
+  for (const r of state.reminders.values()) {
+    if (!(r.companies || []).includes(cid)) continue;
+    for (const h of r.history || []) if (h.type === "done") out.push({ at: h.at, type: "reminder", text: `${r.title}: ${h.text}`, src: { kind: "reminder", id: r.id, title: r.title } });
+  }
+  for (const h of state.entities.get(cid)?.history || []) out.push({ at: h.at, type: "profile", text: h.text });
+  return out.sort((a, b) => b.at.localeCompare(a.at));
+}
+function historyHTML(c) {
+  const all = companyHistory(c.id);
+  const f = flip.histFilter;
+  const items = f === "all" ? all : all.filter(x => x.type === f);
+  const counts = Object.fromEntries(Object.keys(HIST_TYPES).map(k => [k, all.filter(x => x.type === k).length]));
+  let month = "", body = "";
+  for (const x of items) {
+    const m = new Date(x.at).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+    if (m !== month) { body += `${month ? "</ul>" : ""}<div class="hist-month">${m}</div><ul class="hist">`; month = m; }
+    const T = HIST_TYPES[x.type];
+    const src = x.src ? (x.src.kind === "task"
+      ? `<div class="src" data-entact="task" data-id="${x.src.id}">Task: ${esc(x.src.title)} ↗</div>`
+      : `<div class="src" data-entact="hrem" data-id="${x.src.id}">Reminder: ${esc(x.src.title)} ↗</div>`) : "";
+    body += `<li style="--dot:${T.dot}"><div class="when">${fmtStamp(x.at)} · ${T.label.replace(/s$/, "").replace("Follow-ups and response", "Follow-up / response")}</div>
+      <div class="what">${x.icon || T.icon} ${esc(x.text)}</div>${src}</li>`;
+  }
+  if (month) body += "</ul>";
+  return `<div class="pf-head"><h2>History · ${esc(c.short || c.name)}</h2>
+      <button class="btn small" data-entact="hback">← Profile</button>
+      <button class="btn small ghost" data-entact="close" aria-label="Close">✕ Close</button></div>
+    <div class="pf-body">
+      <p class="muted" style="margin:10px 0 0;font-size:14px">Everything completed for this ${kindOf(c) === "property" ? "property" : kindOf(c) === "person" ? "person" : "company"}, newest first. Built automatically from tasks and reminders tagged with it.</p>
+      <div class="hist-filters">
+        <button class="${f === "all" ? "on" : ""}" data-entact="hfilter" data-f="all">All · ${all.length}</button>
+        ${Object.entries(HIST_TYPES).filter(([k]) => counts[k]).map(([k, T]) => `<button class="${f === k ? "on" : ""}" data-entact="hfilter" data-f="${k}">${T.label} · ${counts[k]}</button>`).join("")}
+      </div>
+      ${items.length ? body : `<div class="rempty" style="margin-top:14px">Nothing recorded yet. Completed tasks, checklist steps, follow-ups, notes and finished reminders tagged with this ${kindOf(c) === "company" ? "company" : "card"} will appear here.</div>`}
     </div>`;
 }
 
@@ -2095,7 +2171,11 @@ function wireCompanies() {
     const act = a.dataset.entact;
     if (act === "add") addCompanyDialog();
     else if (act === "close") closeFlip();
-    else if (act === "edit") { flip.editing = true; renderBack(); }
+    else if (act === "edit") { flip.editing = true; flip.history = false; renderBack(); }
+    else if (act === "history") { flip.history = true; renderBack(); }
+    else if (act === "hback") { flip.history = false; renderBack(); }
+    else if (act === "hfilter") { flip.histFilter = a.dataset.f; renderBack(); }
+    else if (act === "hrem") { const r = state.reminders.get(a.dataset.id); if (r) remQuickActions(r); }
     else if (act === "cancel") { flip.editing = false; renderBack(); }
     else if (act === "save") saveEntityForm();
     else if (act === "delrow") a.closest(".erow").remove();
@@ -2159,7 +2239,7 @@ function wireGlobal() {
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
     if (e.key === "Escape") {
       if (!$("#modal").hidden) closeModal();
-      else if (!$("#flipCard").hidden) { if (flip.editing) { flip.editing = false; renderBack(); } else closeFlip(); }
+      else if (!$("#flipCard").hidden) { if (flip.editing || flip.history) { flip.editing = false; flip.history = false; renderBack(); } else closeFlip(); }
       else if (state.openId) closePanel();
       else if (!$("#review").hidden) closeReview();
     }
