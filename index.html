@@ -281,6 +281,22 @@ label.f input,label.f select,label.f textarea{font-size:15.5px;color:var(--ink);
 .hist .src{font-size:13px;color:var(--accent);cursor:pointer}
 .hist .src:hover{text-decoration:underline}
 
+.ct-view{padding:0 20px 40px}
+.ct-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 14px}
+.ct-tools input,.ct-tools select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:15px}
+.ct-tools input{flex:1;min-width:220px}
+.ct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
+.ct{background:var(--surface);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.ct .cn{font-size:17px;font-weight:650;cursor:pointer}
+.ct .cn:hover{text-decoration:underline}
+.ct .co{font-size:14px;color:var(--muted)}
+.ct .line{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14.5px}
+.gmail{display:inline-flex;align-items:center;gap:4px;border:1px solid #f0c9c4;background:#fff;color:#c5221f;border-radius:8px;padding:3px 10px;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer}
+.gmail:hover{background:#fdecea}
+.clink{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#faf9f6;border-radius:10px;padding:7px 10px;margin-bottom:6px;font-size:14.5px}
+.clink b{font-weight:600}
+.clink .x{border:0;background:transparent;color:#a8a296;font-size:18px;cursor:pointer;margin-left:auto}
+
 /* Login */
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .login .box{background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:var(--shadow);text-align:center}
@@ -304,7 +320,7 @@ footer.disc{padding:0 20px 24px;font-size:12.5px;color:var(--muted)}
   <header class="top">
     <h1>Business Setup & Operations Tracker</h1>
     <span class="viewseg" role="tablist" aria-label="View">
-      <button data-view="board" class="on">Board</button><button data-view="reminders">Reminders<span class="badge" id="remBadge" hidden></span></button><button data-view="companies">Companies</button>
+      <button data-view="board" class="on">Board</button><button data-view="reminders">Reminders<span class="badge" id="remBadge" hidden></span></button><button data-view="companies">Companies</button><button data-view="contacts">Contacts</button>
     </span>
     <span id="saveState" class="save-state"></span>
     <button id="undoBtn" class="btn" disabled title="Undo (Ctrl/Cmd+Z)">↶ Undo</button>
@@ -329,6 +345,7 @@ footer.disc{padding:0 20px 24px;font-size:12.5px;color:var(--muted)}
   <main class="board" id="board" data-boardonly></main>
   <section id="remView" class="rem-view" hidden></section>
   <section id="entView" class="ent-view" hidden></section>
+  <section id="ctView" class="ct-view" hidden></section>
   <footer class="disc">Workflow checklists and example tasks are organizational aids only, not legal or tax instructions. Verify regulatory requirements and tax treatment with the appropriate professional.</footer>
 </div>
 
@@ -513,11 +530,14 @@ function localStore() {
         save();
       }
     },
-    subscribe(onTasks, onSettings, onError, onReminders, onEntities) {
+    subscribe(onTasks, onSettings, onError, onReminders, onEntities, onContacts) {
       data.reminders ||= {}; data.entities ||= {};
       onSettings(data.settings); onTasks(Object.values(data.tasks)); onReminders?.(Object.values(data.reminders));
       onEntities?.(Object.values(data.entities));
+      data.contacts ||= {}; onContacts?.(Object.values(data.contacts));
     },
+    async saveContacts(list) { data.contacts ||= {}; list.forEach(c => data.contacts[c.id] = c); save(); },
+    async deleteContacts(ids) { ids.forEach(id => delete data.contacts?.[id]); save(); },
     async saveEntities(list) { data.entities ||= {}; list.forEach(e => data.entities[e.id] = e); save(); },
     async saveTasks(list) { list.forEach(t => data.tasks[t.id] = t); save(); },
     async deleteTasks(ids) { ids.forEach(id => delete data.tasks[id]); save(); },
@@ -542,6 +562,7 @@ async function firebaseStore() {
   const tasksCol = F.collection(wsRef, "tasks");
   const remCol = F.collection(wsRef, "reminders");
   const entCol = F.collection(wsRef, "entities");
+  const ctCol = F.collection(wsRef, "contacts");
   const saveIn = async (col, list) => { const b = F.writeBatch(db); list.forEach(x => b.set(F.doc(col, x.id), clone(x))); await b.commit(); };
   const delIn = async (col, ids) => { const b = F.writeBatch(db); ids.forEach(id => b.delete(F.doc(col, id))); await b.commit(); };
   return {
@@ -558,8 +579,9 @@ async function firebaseStore() {
         await b.commit();
       }
     },
-    subscribe(onTasks, onSettings, onError, onReminders, onEntities) {
+    subscribe(onTasks, onSettings, onError, onReminders, onEntities, onContacts) {
       F.onSnapshot(entCol, qs => onEntities(qs.docs.map(d => ({ ...d.data(), id: d.id }))), onError);
+      F.onSnapshot(ctCol, qs => onContacts(qs.docs.map(d => ({ ...d.data(), id: d.id }))), onError);
       F.onSnapshot(wsRef, s => s.exists() && onSettings(s.data()), onError);
       F.onSnapshot(tasksCol, qs => onTasks(qs.docs.map(d => ({ ...d.data(), id: d.id }))), onError);
       F.onSnapshot(remCol, qs => onReminders(qs.docs.map(d => ({ ...d.data(), id: d.id }))), onError);
@@ -568,6 +590,8 @@ async function firebaseStore() {
     deleteTasks: ids => delIn(tasksCol, ids),
     saveReminders: list => saveIn(remCol, list),
     saveEntities: list => saveIn(entCol, list),
+    saveContacts: list => saveIn(ctCol, list),
+    deleteContacts: ids => delIn(ctCol, ids),
     deleteReminders: ids => delIn(remCol, ids),
     async saveSettings(s) { await F.setDoc(wsRef, clone(s), { merge: true }); },
   };
@@ -577,7 +601,7 @@ async function firebaseStore() {
    6. STATE & PERSISTENCE
    ================================================================ */
 let store;
-const state = { tasks: new Map(), reminders: new Map(), entities: new Map(), settings: DEFAULT_SETTINGS, filter: null, openId: null, view: "board" };
+const state = { tasks: new Map(), reminders: new Map(), entities: new Map(), contacts: new Map(), userEmail: "", settings: DEFAULT_SETTINGS, filter: null, openId: null, view: "board" };
 const undoStack = [];
 let pending = 0, saveError = false;
 
@@ -760,7 +784,8 @@ function cardHTML(t) {
     const late = isDueOverdue(t), soon = !late && daysFromToday(t.dueDate) <= 3;
     meta.push(`<span class="${late ? "late" : soon ? "soon" : ""}">📅 ${late ? "Overdue · " : ""}${fmt(t.dueDate)}</span>`);
   }
-  if (t.status !== "waiting" && t.contacts?.[0]?.name) meta.push(`<span>👤 ${esc(t.contacts[0].name)}</span>`);
+  const c0 = (t.contactIds || []).map(id => state.contacts.get(id)).find(Boolean);
+  if (t.status !== "waiting" && c0) meta.push(`<span>👤 ${esc(c0.name)}</span>`);
   return `<article class="card ${t.status === "done" ? "done" : ""}" data-id="${t.id}" style="--c:${comps[0]?.color || "#c9c4ba"}">
     <button class="edit-title" data-edit="${t.id}" title="Rename" aria-label="Rename task">✎</button>
     <div class="card-top">${chips}</div>
@@ -809,6 +834,7 @@ function renderAll() {
   renderTiles(); renderPriorities(); renderBoard(); renderReminderChrome();
   if (state.view === "reminders") renderRemView();
   if (state.view === "companies" && $("#flipCard").hidden) renderEntView();
+  if (state.view === "contacts") renderCtView();
   if (!$("#review").hidden) renderReview();
 }
 
@@ -957,6 +983,20 @@ function renderPanel() {
       </div>
     </div>
 
+    <div class="section">
+      <h3>Contacts</h3>
+      ${(t.contactIds || []).map(id => state.contacts.get(id)).filter(Boolean).map(c => `<div class="clink">
+        <b>${esc(c.name)}</b><span class="muted">${esc([c.role, c.org].filter(Boolean).join(" · "))}</span>
+        ${c.email ? `<a class="gmail" href="${gmailUrl({ to: c.email, su: t.title })}" target="_blank" rel="noopener">✉ Gmail</a>` : ""}
+        ${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s+/g, ""))}">${esc(c.phone)}</a>` : ""}
+        <button class="x" data-unlink="${c.id}" title="Unlink contact" aria-label="Unlink ${esc(c.name)}">×</button></div>`).join("")}
+      <select data-field="linkContact" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:14.5px">
+        <option value="">+ Link a contact…</option>
+        ${[...state.contacts.values()].filter(c => !(t.contactIds || []).includes(c.id)).sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}">${esc(c.name)}${c.org ? " · " + esc(c.org) : ""}</option>`).join("")}
+        <option value="__new">+ New contact…</option>
+      </select>
+    </div>
+
     ${showWait ? `
     <div class="section">
       <h3>Waiting on others</h3>
@@ -1062,6 +1102,10 @@ function wirePanel() {
       newCategoryDialog(name => { t.category = name; persist(t); renderAll(); renderPanel(); }, () => renderPanel());
     } else if (el.dataset.field === "category" || el.dataset.field === "dueDate") {
       t[el.dataset.field] = el.value; persist(t); renderAll();
+    } else if (el.dataset.field === "linkContact") {
+      const link = id => { t.contactIds = [...new Set([...(t.contactIds || []), id])]; log(t, `Linked contact: ${state.contacts.get(id)?.name || ""}`, "info"); persist(t); renderAll(); renderPanel(); };
+      if (el.value === "__new") contactForm(null, { companies: [...(t.companies || [])], onSaved: c => link(c.id), onCancel: () => renderPanel() });
+      else if (el.value) link(el.value);
     } else if (el.dataset.field === "decisionNeeded") {
       t.decisionNeeded = el.checked;
       log(t, el.checked ? "Marked as needing a decision" : "Decision no longer needed", "info");
@@ -1084,7 +1128,9 @@ function wirePanel() {
   P.addEventListener("click", e => {
     const t = current(); if (!t) return;
     const b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.company) {
+    if (b.dataset.unlink) {
+      t.contactIds = (t.contactIds || []).filter(id => id !== b.dataset.unlink); persist(t); renderAll(); renderPanel();
+    } else if (b.dataset.company) {
       const id = b.dataset.company, set = new Set(t.companies || []);
       set.has(id) ? set.delete(id) : set.add(id);
       t.companies = [...set]; persist(t); renderAll(); renderPanel();
@@ -1307,10 +1353,12 @@ function emailTemplate(t) {
     <div class="seg" style="max-width:220px"><button type="button" data-lang="en" class="on">English</button><button type="button" data-lang="de">Deutsch</button></div>
     <label class="f">Edit before copying<textarea name="body">${esc(emailText(t, "en"))}</textarea></label>`,
     [{ label: "Close", cls: "ghost" },
-     { label: "Open in email app", onClick: v => {
+     { label: "✉ Open in Gmail", onClick: v => {
         const [first, ...rest] = v.body.split("\n");
         const subj = first.replace(/^(Subject|Betreff):\s*/i, "");
-        location.href = `mailto:?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(rest.join("\n").trim())}`;
+        const to = taskEmails(t);
+        open(gmailUrl({ to, su: subj, body: rest.join("\n").trim() }), "_blank", "noopener");
+        if (!to) toast("No email on the linked contacts. Add the address in Gmail.");
         return false;
      } },
      { label: "Copy", cls: "primary", primary: true, onClick: v => { copyText(v.body); return false; } }]);
@@ -1394,6 +1442,7 @@ function reviewItemHTML(t, key) {
     acts.push(A("followup", "✓ Follow-Up Completed", "primary"), A("response", "⇠ Response Received"), A("snooze", "Set new follow-up date"));
     if (isFollowUpDue(t)) acts.push(A("dismiss", "Dismiss reminder", "ghost"));
   }
+  if (t.status === "waiting") acts.push(A("email", "✉ Follow-up email"));
   acts.push(A("note", "Add note"));
   if (t.status !== "progress") acts.push(A("progress", "Move to In Progress"));
   acts.push(A("done", "Mark Completed"), A("open", "Open ticket", "ghost"));
@@ -1453,6 +1502,7 @@ function wireReview() {
       snooze: () => snoozeFollowUp(t),
       dismiss: () => dismissReminder(t),
       note: () => noteDialog(t),
+      email: () => emailTemplate(t),
       progress: () => setStatus(t, "progress"),
       done: () => setStatus(t, "done"),
     })[act]?.();
@@ -1559,6 +1609,7 @@ function setView(v) {
   document.querySelectorAll("[data-boardonly]").forEach(el => el.hidden = v !== "board");
   $("#remView").hidden = v !== "reminders";
   $("#entView").hidden = v !== "companies";
+  $("#ctView").hidden = v !== "contacts";
   if (v !== "board") { state.filter = null; $("#filterbar").hidden = true; }
   renderAll();
   if (v === "companies") renderEntView();
@@ -1973,6 +2024,10 @@ function renderBack() {
       <div class="pf-sec"><h3>Documents</h3>${(e.docs || []).length ? `<ul style="margin:0;padding-left:18px">${e.docs.map(d => `<li>${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.label || d.url)} ↗</a>` : esc(d.label)}</li>`).join("")}</ul>` : `<p class="muted" style="margin:0;font-size:14px">No documents linked.</p>`}</div>
       ${(e.custom || []).length ? `<div class="pf-sec"><h3>Other details</h3><dl class="kv">${e.custom.map(x => kvRow(esc(x.label || "—"), x.value, { mono: true })).join("")}</dl></div>` : ""}
       ${e.notes ? `<div class="pf-sec"><h3>Notes</h3><p style="margin:0;white-space:pre-line">${esc(e.notes)}</p></div>` : ""}
+      <div class="pf-sec"><h3>Contacts</h3>${(() => { const cs = [...state.contacts.values()].filter(x => (x.companies || []).includes(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+        return cs.length ? cs.map(x => `<div class="clink"><b>${esc(x.name)}</b><span class="muted">${esc([x.role, x.org].filter(Boolean).join(" · "))}</span>
+          ${x.email ? `<a class="gmail" href="${gmailUrl({ to: x.email })}" target="_blank" rel="noopener">✉ Gmail</a>` : ""}${x.phone ? `<a href="tel:${esc(x.phone.replace(/\s+/g, ""))}">${esc(x.phone)}</a>` : ""}</div>`).join("")
+          : `<p class="muted" style="margin:0;font-size:14px">No contacts tagged with this ${kindOf(c) === "company" ? "company" : "card"} yet. Add them in Contacts.</p>`; })()}</div>
       <div class="pf-sec"><h3>In the tracker</h3>
         <dl class="kv"><dt>Open tasks (${tasks.length})</dt><dd>${tasks.length ? `<ul class="linked" style="margin:0;padding-left:18px">${tasks.slice(0, 8).map(t => `<li data-entact="task" data-id="${t.id}">${esc(t.title)} <span class="muted">· ${STATUS_NAME[t.status]}</span></li>`).join("")}</ul>` : "—"}</dd>
         <dt>Reminders (${rems.length})</dt><dd>${rems.length ? `<ul class="linked" style="margin:0;padding-left:18px">${rems.map(r => `<li data-rem="${r.id}">${esc(r.title)} <span class="muted">· due ${fmtY(r.dueDate)}</span></li>`).join("")}</ul>` : "—"}</dd></dl>
@@ -2187,6 +2242,118 @@ function wireCompanies() {
 }
 
 /* ================================================================
+   11f. CONTACTS — directory of external parties, with Gmail compose links.
+   Stored in workspaces/main/contacts/{id}; tasks link them by contactIds.
+   ================================================================ */
+const CONTACT_ROLES = ["Bank", "Steuerberater", "Notary", "Lawyer", "Insurance", "Finanzamt / authority", "Financial advisor", "Property / landlord", "Supplier", "Other"];
+const ctFilter = { q: "", role: "", company: "" };
+
+// Opens a Gmail compose window; uses the signed-in Google account when known.
+function gmailUrl({ to = "", su = "", body = "" } = {}) {
+  const q = [["view", "cm"], ["fs", "1"], ["to", to], ["su", su], ["body", body]].filter(([, v]) => v !== "")
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+  return `https://mail.google.com/mail/${state.userEmail ? "u/" + encodeURIComponent(state.userEmail) + "/" : ""}?${q}`;
+}
+const taskEmails = t => (t.contactIds || []).map(id => state.contacts.get(id)?.email).filter(Boolean).join(",");
+
+function contactCardHTML(c) {
+  const comps = (c.companies || []).map(company).filter(Boolean);
+  const linked = [...state.tasks.values()].filter(t => (t.contactIds || []).includes(c.id));
+  const open = linked.filter(t => t.status !== "done").length;
+  return `<div class="ct">
+    <div class="cn" data-ctact="edit" data-id="${c.id}">${esc(c.name)}</div>
+    <div class="co">${esc([c.role, c.org].filter(Boolean).join(" · ")) || "&nbsp;"}</div>
+    ${comps.length ? `<div class="line">${comps.map(x => `<span class="chip" style="--cs:${x.soft}">${esc(x.short || x.name)}</span>`).join("")}</div>` : ""}
+    ${c.email ? `<div class="line"><span>${esc(c.email)}</span><a class="gmail" href="${gmailUrl({ to: c.email })}" target="_blank" rel="noopener">✉ Gmail</a><button class="copy" data-copy="${esc(c.email)}">Copy</button></div>` : ""}
+    ${c.phone ? `<div class="line"><a href="tel:${esc(c.phone.replace(/\s+/g, ""))}">📞 ${esc(c.phone)}</a></div>` : ""}
+    ${linked.length ? `<div class="line muted" style="font-size:13px">${open} open task${open === 1 ? "" : "s"} · ${linked.length} total</div>` : ""}
+  </div>`;
+}
+
+function renderCtView() {
+  const V = $("#ctView");
+  if (V.hidden) return;
+  const focusSearch = document.activeElement?.id === "ctSearch";
+  const q = ctFilter.q.toLowerCase();
+  const list = [...state.contacts.values()]
+    .filter(c => !ctFilter.role || c.role === ctFilter.role)
+    .filter(c => !ctFilter.company || (c.companies || []).includes(ctFilter.company))
+    .filter(c => !q || [c.name, c.org, c.role, c.email, c.phone, c.notes, ...(c.companies || []).map(id => company(id)?.name)].join(" ").toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const roles = [...new Set([...CONTACT_ROLES, ...[...state.contacts.values()].map(c => c.role).filter(Boolean)])];
+  V.innerHTML = `<div class="ev-head" style="display:flex;align-items:center;gap:10px;margin:4px 0"><h2 style="flex:1;margin:0;font-size:20px">Contacts</h2>
+      <button class="btn primary" data-ctact="new">+ Add contact</button></div>
+    <div class="ct-tools">
+      <input id="ctSearch" type="search" placeholder="Search name, organization, email…" value="${esc(ctFilter.q)}" aria-label="Search contacts">
+      <select id="ctRole" aria-label="Filter by role"><option value="">All roles</option>${roles.map(r => `<option ${ctFilter.role === r ? "selected" : ""}>${esc(r)}</option>`).join("")}</select>
+      <select id="ctCompany" aria-label="Filter by company"><option value="">All companies</option>${entityCompanies().map(c => `<option value="${c.id}" ${ctFilter.company === c.id ? "selected" : ""}>${esc(c.short || c.name)}</option>`).join("")}</select>
+    </div>
+    ${state.contacts.size ? (list.length ? `<div class="ct-grid">${list.map(contactCardHTML).join("")}</div>` : `<div class="rempty">No contacts match.</div>`)
+      : `<div class="rempty">No contacts yet. Add your bank advisor, Steuerberater, notary or insurance agent. Each email address gets a Gmail button, and you can link contacts to tasks.</div>`}`;
+  if (focusSearch) { const i = $("#ctSearch"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+}
+
+function contactForm(c, { companies = [], onSaved, onCancel } = {}) {
+  const isNew = !c;
+  c = c || { id: uid(), name: "", org: "", role: "", email: "", phone: "", website: "", address: "", companies, notes: "", createdAt: new Date().toISOString() };
+  const linked = [...state.tasks.values()].filter(t => (t.contactIds || []).includes(c.id));
+  modal(`<h2>${isNew ? "New contact" : "Edit contact"}</h2>
+    <div class="grid2">
+      <label class="f">Name<input name="name" value="${esc(c.name)}" placeholder="Frau Schmidt"></label>
+      <label class="f">Organization<input name="org" value="${esc(c.org)}" placeholder="Sparkasse, Steuerkanzlei…"></label>
+      <label class="f">Role<select name="role"><option value="">—</option>${[...new Set([...CONTACT_ROLES, c.role].filter(Boolean))].map(r => `<option ${c.role === r ? "selected" : ""}>${esc(r)}</option>`).join("")}</select></label>
+      <label class="f">Email<input type="email" name="email" value="${esc(c.email)}" placeholder="name@bank.de"></label>
+      <label class="f">Phone<input name="phone" value="${esc(c.phone)}" placeholder="+49 631 …"></label>
+      <label class="f">Website<input name="website" value="${esc(c.website)}" placeholder="https://"></label>
+    </div>
+    <label class="f">Address<textarea name="address" rows="2" style="min-height:0">${esc(c.address)}</textarea></label>
+    <div class="f" style="font-size:13.5px;color:var(--muted)">Works with
+      <div class="chipboxes" style="margin-top:4px">${state.settings.companies.filter(x => x.id !== "general").map(x => `<label><input type="checkbox" name="co_${x.id}" ${(c.companies || []).includes(x.id) ? "checked" : ""}>${esc(x.short || x.name)}</label>`).join("")}</div></div>
+    <label class="f">Notes<textarea name="notes" rows="2" style="min-height:0" placeholder="Best time to call, reference numbers…">${esc(c.notes)}</textarea></label>
+    ${linked.length ? `<div class="f" style="font-size:13.5px;color:var(--muted)">Linked tasks<ul style="margin:4px 0 0;padding-left:18px;color:var(--ink)">${linked.map(t => `<li>${esc(t.title)} <span class="muted">· ${STATUS_NAME[t.status]}</span></li>`).join("")}</ul></div>` : ""}
+    ${!isNew && c.email ? `<p style="margin:0"><a class="gmail" href="${gmailUrl({ to: c.email })}" target="_blank" rel="noopener">✉ Write in Gmail</a></p>` : ""}`,
+    [...(isNew ? [] : [{ label: "Delete", cls: "danger", onClick: () => { setTimeout(() => confirmDeleteContact(c), 0); } }]),
+     { label: "Cancel", cls: "ghost", onClick: () => { onCancel?.(); } },
+     { label: isNew ? "Add contact" : "Save", cls: "primary", primary: true, onClick: (v, form) => {
+        if (!v.name.trim()) { let e = form.querySelector(".ferr"); if (!e) { e = document.createElement("p"); e.className = "ferr"; e.style.cssText = "color:var(--danger);font-size:14px;margin:0"; form.querySelector(".actions").before(e); } e.textContent = "Enter a name."; return false; }
+        Object.assign(c, { name: v.name.trim(), org: v.org.trim(), role: v.role, email: v.email.trim(), phone: v.phone.trim(),
+          website: v.website.trim(), address: v.address, notes: v.notes,
+          companies: state.settings.companies.filter(x => v["co_" + x.id]).map(x => x.id), updatedAt: new Date().toISOString() });
+        state.contacts.set(c.id, c);
+        pending++; setSaveState();
+        store.saveContacts([clone(c)]).then(() => { pending--; setSaveState(); }).catch(err => { pending--; saveError = true; setSaveState(); toast("Could not save: " + err.message); });
+        renderAll();
+        onSaved?.(c);
+        toast(isNew ? `${c.name} added to contacts` : "Contact saved");
+     } }]);
+}
+
+function confirmDeleteContact(c) {
+  const linked = [...state.tasks.values()].filter(t => (t.contactIds || []).includes(c.id));
+  modal(`<h2>Delete ${esc(c.name)}?</h2><p>${linked.length ? `They are linked to ${linked.length} task${linked.length === 1 ? "" : "s"}; the links will be removed. ` : ""}Tasks and notes are not deleted.</p>`,
+    [{ label: "Cancel", cls: "ghost" },
+     { label: "Delete", cls: "primary", primary: true, onClick: () => {
+        state.contacts.delete(c.id);
+        store.deleteContacts([c.id]).catch(err => toast("Could not delete: " + err.message));
+        if (linked.length) { linked.forEach(t => t.contactIds = t.contactIds.filter(id => id !== c.id)); persist(linked); }
+        renderAll(); toast("Contact deleted");
+     } }]);
+}
+
+function wireContacts() {
+  document.addEventListener("click", e => {
+    const a = e.target.closest("[data-ctact]"); if (!a) return;
+    if (a.dataset.ctact === "new") contactForm(null, { companies: ctFilter.company ? [ctFilter.company] : [] });
+    else if (a.dataset.ctact === "edit") { const c = state.contacts.get(a.dataset.id); if (c) contactForm(c); }
+  });
+  document.addEventListener("input", e => { if (e.target.id === "ctSearch") { ctFilter.q = e.target.value; renderCtView(); } });
+  document.addEventListener("change", e => {
+    if (e.target.id === "ctRole") { ctFilter.role = e.target.value; renderCtView(); }
+    if (e.target.id === "ctCompany") { ctFilter.company = e.target.value; renderCtView(); }
+  });
+}
+
+/* ================================================================
    12. TOAST
    ================================================================ */
 let toastTimer;
@@ -2255,7 +2422,7 @@ function start() {
   if (started) return; started = true;
   $("#login").hidden = true;
   $("#app").hidden = false;
-  buildBoard(); wireGlobal(); wirePanel(); wireReview(); wireReminders(); wireCompanies();
+  buildBoard(); wireGlobal(); wirePanel(); wireReview(); wireReminders(); wireCompanies(); wireContacts();
   store.subscribe(
     tasks => {
       state.tasks = new Map(tasks.map(t => [t.id, t]));
@@ -2266,7 +2433,8 @@ function start() {
     settings => { state.settings = { ...DEFAULT_SETTINGS, ...settings }; ensurePrivateHouse(); renderAll(); },
     err => { console.error(err); toast("Connection problem: " + err.message); },
     rems => { state.reminders = new Map(rems.map(r => [r.id, r])); renderAll(); },
-    ents => { state.entities = new Map(ents.map(e => [e.id, e])); if (state.view === "companies" && !flip.editing) renderEntView(); }
+    ents => { state.entities = new Map(ents.map(e => [e.id, e])); if (state.view === "companies" && !flip.editing) renderEntView(); },
+    cts => { state.contacts = new Map(cts.map(c => [c.id, c])); renderAll(); if (state.openId && !$("#panel").contains(document.activeElement)) renderPanel(); }
   );
   setSaveState();
 }
@@ -2289,6 +2457,7 @@ async function boot() {
   $("#signin").onclick = () => store.signIn().catch(e => $("#loginErr").textContent = e.message);
   store.onAuth(async user => {
     if (!user) { $("#app").hidden = true; $("#login").hidden = false; return; }
+    state.userEmail = user.email || "";
     try { await store.init(); start(); }
     catch (e) {
       $("#login").hidden = false; $("#app").hidden = true;
